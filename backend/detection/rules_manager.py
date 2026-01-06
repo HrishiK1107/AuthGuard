@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 
 
 class RulesManager:
@@ -7,8 +7,7 @@ class RulesManager:
     """
 
     def __init__(self):
-        # Rule configuration store
-        self.rules: Dict[str, Dict] = {
+        self.rules: Dict[str, Dict[str, Any]] = {
             "failed_login_velocity": {
                 "enabled": True,
                 "threshold": 5
@@ -23,6 +22,22 @@ class RulesManager:
             }
         }
 
+    # -----------------------------
+    # Query helpers (USED BY API)
+    # -----------------------------
+
+    def get_all_rules(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Return all rules with status and thresholds.
+        """
+        return self.rules
+
+    def rule_exists(self, rule_name: str) -> bool:
+        """
+        Check if rule exists.
+        """
+        return rule_name in self.rules
+
     def is_enabled(self, rule_name: str) -> bool:
         """
         Check if a rule is enabled.
@@ -35,14 +50,18 @@ class RulesManager:
         """
         return self.rules.get(rule_name, {}).get("threshold", 0)
 
-    def enable_rule(self, rule_name: str) -> None:
+    # -----------------------------
+    # Mutation helpers (USED BY API)
+    # -----------------------------
+
+    def enable(self, rule_name: str) -> None:
         if rule_name in self.rules:
             self.rules[rule_name]["enabled"] = True
 
-    def disable_rule(self, rule_name: str) -> None:
+    def disable(self, rule_name: str) -> None:
         if rule_name in self.rules:
             self.rules[rule_name]["enabled"] = False
 
-    def update_threshold(self, rule_name: str, value: int) -> None:
+    def update_threshold(self, rule_name: str, value: float) -> None:
         if rule_name in self.rules:
             self.rules[rule_name]["threshold"] = value

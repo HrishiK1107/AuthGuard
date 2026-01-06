@@ -1,15 +1,16 @@
 import requests
 from typing import Dict, Any, List
 
+from backend.storage.event_log import append_event
 from backend.detection.event_ingest import ingest_event, AuthEvent
 from backend.detection.signals import (
     failed_login_velocity,
     ip_fan_out,
     user_fan_in
 )
-from backend.detection.rules_manager import RulesManager
 from backend.detection.state_store import StateStore
 from backend.detection.decision_engine import DecisionEngine
+from backend.detection.shared import rules_manager   # ✅ SHARED INSTANCE
 
 
 class EventProcessor:
@@ -19,7 +20,7 @@ class EventProcessor:
     """
 
     def __init__(self):
-        self.rules_manager = RulesManager()
+        # IMPORTANT: RulesManager is NOT instantiated here
         self.state_store = StateStore()
         self.decision_engine = DecisionEngine()
 
@@ -36,11 +37,11 @@ class EventProcessor:
 
         # 2. Run signals (only if enabled)
 
-        if self.rules_manager.is_enabled("failed_login_velocity"):
+        if rules_manager.is_enabled("failed_login_velocity"):
             result = failed_login_velocity(
                 event,
                 self.state_store.get_ip_failure_window(),
-                threshold=self.rules_manager.get_threshold("failed_login_velocity")
+                threshold=rules_manager.get_threshold("failed_login_velocity")
             )
             if result.get("triggered"):
                 triggered_signals.append(result)
@@ -50,11 +51,11 @@ class EventProcessor:
                     timestamp=event.timestamp
                 )
 
-        if self.rules_manager.is_enabled("ip_fan_out"):
+        if rules_manager.is_enabled("ip_fan_out"):
             result = ip_fan_out(
                 event,
                 self.state_store.get_ip_user_window(),
-                threshold=self.rules_manager.get_threshold("ip_fan_out")
+                threshold=rules_manager.get_threshold("ip_fan_out")
             )
             if result.get("triggered"):
                 triggered_signals.append(result)
@@ -64,11 +65,11 @@ class EventProcessor:
                     timestamp=event.timestamp
                 )
 
-        if self.rules_manager.is_enabled("user_fan_in"):
+        if rules_manager.is_enabled("user_fan_in"):
             result = user_fan_in(
                 event,
                 self.state_store.get_user_ip_window(),
-                threshold=self.rules_manager.get_threshold("user_fan_in")
+                threshold=rules_manager.get_threshold("user_fan_in")
             )
             if result.get("triggered") and event.username:
                 triggered_signals.append(result)
@@ -79,7 +80,6 @@ class EventProcessor:
                 )
 
         # 3. Fetch current risk scores
-
         ip_risk = self.state_store.get_risk_engine().get_risk(
             event.ip_address, event.timestamp
         )
@@ -90,14 +90,12 @@ class EventProcessor:
             else 0.0
         )
 
-        # Use the higher risk (worst-case)
         effective_risk = max(ip_risk, user_risk)
 
         # 4. Decide action
         decision = self.decision_engine.decide(effective_risk)
 
         # 5. Enforce decision via Go rate limiter
-        # Prefer IP enforcement; fallback to username if needed
         entity = event.ip_address or event.username
 
         enforcement = self.enforce_with_go(
@@ -105,7 +103,19 @@ class EventProcessor:
             decision=decision["decision"]
         )
 
-        # 6. Return explainable response
+        # 6. Persist event (append-only)
+        append_event(
+            ts=event.timestamp,
+            entity=entity,
+            endpoint=event.endpoint,
+            outcome=event.outcome,
+            decision=decision["decision"],
+            risk=effective_risk,
+            enforcement=enforcement,
+            raw_event=raw_event,
+        )
+
+        # 7. Return explainable response
         return {
             "decision": decision["decision"],
             "risk_score": effective_risk,
@@ -123,7 +133,6 @@ class EventProcessor:
         payload = {
             "entity": entity,
             "decision": decision,
-            # Only BLOCK needs TTL
             "ttl_seconds": 300 if decision == "BLOCK" else 0
         }
 
@@ -136,7 +145,6 @@ class EventProcessor:
             return resp.json()
 
         except Exception as e:
-            # Fail-open is intentional to avoid auth outages
             return {
                 "allowed": True,
                 "reason": f"enforcement unavailable: {e}"
