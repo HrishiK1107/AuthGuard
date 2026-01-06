@@ -36,11 +36,15 @@ def brute_force_attack(
 
         decision = result["result"]["decision"]
         risk = result["result"]["risk_score"]
+        decision_reason = result["result"]["decision_reason"]
+        enforcement = result["result"]["enforcement"]
 
         print(
-            f"[Attempt {i}] "
-            f"Decision={decision} | Risk={risk}"
-        )
+             f"[Attempt {i}] "
+             f"Decision={decision} | Risk={risk:.2f} | "
+             f"DecisionReason={decision_reason} | "
+             f"Enforcement={enforcement}"
+         )
 
         time.sleep(delay)
 
@@ -50,7 +54,7 @@ def brute_force_attack(
 if __name__ == "__main__":
     brute_force_attack(
         username="admin",
-        ip_address="10.0.0.5",
+        ip_address="10.0.0.200",
         attempts=10,
         delay=0.5
     )

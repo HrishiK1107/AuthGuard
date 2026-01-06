@@ -1,3 +1,4 @@
+import requests
 from typing import Dict, Any, List
 
 from backend.detection.event_ingest import ingest_event, AuthEvent
@@ -14,7 +15,7 @@ from backend.detection.decision_engine import DecisionEngine
 class EventProcessor:
     """
     Central orchestration engine.
-    One auth event in → one decision out.
+    One auth event in → one decision out → one enforcement action.
     """
 
     def __init__(self):
@@ -24,7 +25,8 @@ class EventProcessor:
 
     def process(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process a raw authentication event and return a decision.
+        Process a raw authentication event and return a decision
+        along with enforcement result.
         """
 
         # 1. Ingest & validate event
@@ -33,6 +35,7 @@ class EventProcessor:
         triggered_signals: List[Dict[str, Any]] = []
 
         # 2. Run signals (only if enabled)
+
         if self.rules_manager.is_enabled("failed_login_velocity"):
             result = failed_login_velocity(
                 event,
@@ -75,7 +78,8 @@ class EventProcessor:
                     timestamp=event.timestamp
                 )
 
-        # 3. Fetch current risk
+        # 3. Fetch current risk scores
+
         ip_risk = self.state_store.get_risk_engine().get_risk(
             event.ip_address, event.timestamp
         )
@@ -86,16 +90,54 @@ class EventProcessor:
             else 0.0
         )
 
-        # Use the higher risk
+        # Use the higher risk (worst-case)
         effective_risk = max(ip_risk, user_risk)
 
         # 4. Decide action
         decision = self.decision_engine.decide(effective_risk)
 
-        # 5. Return explainable response
+        # 5. Enforce decision via Go rate limiter
+        # Prefer IP enforcement; fallback to username if needed
+        entity = event.ip_address or event.username
+
+        enforcement = self.enforce_with_go(
+            entity=entity,
+            decision=decision["decision"]
+        )
+
+        # 6. Return explainable response
         return {
             "decision": decision["decision"],
             "risk_score": effective_risk,
             "signals_triggered": triggered_signals,
-            "reason": decision["reason"]
+            "decision_reason": decision["reason"],
+            "enforcement": enforcement
         }
+
+    def enforce_with_go(self, entity: str, decision: str) -> Dict[str, Any]:
+        """
+        Call Go rate limiter to enforce the decision.
+        Fail-open by design for Phase 1.
+        """
+
+        payload = {
+            "entity": entity,
+            "decision": decision,
+            # Only BLOCK needs TTL
+            "ttl_seconds": 300 if decision == "BLOCK" else 0
+        }
+
+        try:
+            resp = requests.post(
+                "http://localhost:8081/enforce",
+                json=payload,
+                timeout=1
+            )
+            return resp.json()
+
+        except Exception as e:
+            # Fail-open is intentional to avoid auth outages
+            return {
+                "allowed": True,
+                "reason": f"enforcement unavailable: {e}"
+            }
