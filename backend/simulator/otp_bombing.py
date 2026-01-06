@@ -51,7 +51,7 @@ def otp_bombing_attack(
 
 if __name__ == "__main__":
     otp_bombing_attack(
-        username="snitch_nigga",
+        username="Jane Doe",
         ip_address="10.0.0.77",
         attempts=8,
         delay=0.4
