@@ -15,3 +15,8 @@ dist/
 # Logs / data
 *.log
 data/
+
+# Runtime state
+backend/storage/*.db
+backend/storage/active_blocks.json
+backend/storage/settings.json
