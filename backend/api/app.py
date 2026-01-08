@@ -6,7 +6,8 @@ from backend.api.blocks import router as blocks_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.settings import router as settings_router
 from backend.api.simulator import router as simulator_router
-
+from backend.storage.block_store import load_blocks
+import requests
 
 # Create FastAPI app FIRST
 app = FastAPI(
@@ -15,6 +16,28 @@ app = FastAPI(
     version="1.0"
 )
 
+# ==========================
+# REPLAY BLOCKS ON STARTUP
+# ==========================
+@app.on_event("startup")
+def replay_blocks():
+    blocks = load_blocks()
+
+    for entity, ttl in blocks.items():
+        try:
+            requests.post(
+                "http://localhost:8081/enforce",
+                json={
+                    "entity": entity,
+                    "decision": "BLOCK",
+                    "ttl_seconds": ttl
+                },
+                timeout=1
+            )
+        except Exception:
+            # Fail-open on startup
+            pass
+        
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(

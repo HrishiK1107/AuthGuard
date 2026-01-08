@@ -1,85 +1,83 @@
-import { useEffect, useState } from "react";
-import { apiGet } from "../services/api";
-
-type Block = {
-  entity: string;
-  reason: string;
-  expires_in: number | null;
-};
+import { useState } from "react";
+import Card from "../components/ui/Card";
+import { apiPost } from "../services/api";
 
 export default function ActiveBlocks() {
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [entity, setEntity] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiGet<{ blocks: Block[] }>("/blocks/")
-      .then((data) => {
-        setBlocks(data.blocks ?? []);
-        setError(null);
-      })
-      .catch(() => {
-        setError("Enforcement service unavailable");
-        setBlocks([]);
-      });
-  }, []);
+  const blockEntity = async () => {
+    setMessage(null);
+    setError(null);
+
+    try {
+      await apiPost("/blocks/block", { entity });
+      setMessage(`Block request sent for ${entity}`);
+      setEntity("");
+    } catch (e: any) {
+      setError("Enforcement service unavailable (port 8081)");
+    }
+  };
+
+  const unblockEntity = async () => {
+    setMessage(null);
+    setError(null);
+
+    try {
+      await apiPost("/blocks/unblock", { entity });
+      setMessage(`Unblock request sent for ${entity}`);
+      setEntity("");
+    } catch (e: any) {
+      setError("Enforcement service unavailable (port 8081)");
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold">Active Blocks</h1>
+      <div>
+        <h1 className="text-lg font-semibold">Manual Enforcement</h1>
+        <p className="text-sm text-neutral-400">
+          Direct enforcement actions (requires Go rate limiter).
+        </p>
+      </div>
 
-      <p className="text-sm text-neutral-400">
-        Entities currently blocked by enforcement.
-      </p>
+      <Card title="Target Entity">
+        <input
+          value={entity}
+          onChange={(e) => setEntity(e.target.value)}
+          placeholder="IP address or user ID"
+          className="w-full rounded bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm"
+        />
 
-      {error ? (
-        <div className="rounded border border-red-800 bg-red-900/20 p-4 text-red-400">
-          {error}
+        <div className="mt-3 flex gap-3">
+          <button
+            onClick={blockEntity}
+            disabled={!entity}
+            className="rounded bg-red-600 px-4 py-2 text-sm hover:bg-red-500 disabled:opacity-50"
+          >
+            Block
+          </button>
+
+          <button
+            onClick={unblockEntity}
+            disabled={!entity}
+            className="rounded bg-green-600 px-4 py-2 text-sm hover:bg-green-500 disabled:opacity-50"
+          >
+            Unblock
+          </button>
         </div>
-      ) : (
-        <div className="overflow-hidden rounded border border-neutral-800">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-900 text-neutral-400">
-              <tr>
-                <th className="px-4 py-2 text-left">Entity</th>
-                <th className="px-4 py-2 text-left">Reason</th>
-                <th className="px-4 py-2 text-left">Remaining</th>
-              </tr>
-            </thead>
+      </Card>
 
-            <tbody>
-              {blocks.map((block, i) => (
-                <tr
-                  key={i}
-                  className="border-t border-neutral-800 hover:bg-neutral-900"
-                >
-                  <td className="px-4 py-2 font-mono">
-                    {block.entity}
-                  </td>
+      {message && (
+        <div className="rounded border border-green-700 bg-green-900/20 p-3 text-sm text-green-400">
+          {message}
+        </div>
+      )}
 
-                  <td className="px-4 py-2 text-red-400">
-                    {block.reason}
-                  </td>
-
-                  <td className="px-4 py-2">
-                    {block.expires_in
-                      ? `${block.expires_in}s`
-                      : "Permanent"}
-                  </td>
-                </tr>
-              ))}
-
-              {blocks.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={3}
-                    className="px-4 py-6 text-center text-neutral-500 italic"
-                  >
-                    No active blocks
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {error && (
+        <div className="rounded border border-yellow-700 bg-yellow-900/20 p-3 text-sm text-yellow-400">
+          {error}
         </div>
       )}
     </div>

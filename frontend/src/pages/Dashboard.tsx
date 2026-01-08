@@ -2,19 +2,15 @@ import { useEffect, useState } from "react";
 import Card from "../components/ui/Card";
 import { apiGet } from "../services/api";
 
-/* ---------------- Types ---------------- */
-
 type DashboardSummary = {
   total_events: number;
   decision_breakdown: Record<string, number>;
   top_entities: { entity: string; count: number }[];
 };
 
-type Settings = {
+type SettingsResponse = {
   mode: "fail-open" | "fail-closed";
 };
-
-/* ---------------- Component ---------------- */
 
 export default function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary>({
@@ -23,36 +19,24 @@ export default function Dashboard() {
     top_entities: [],
   });
 
-  const [defenseMode, setDefenseMode] = useState<
-    "ACTIVE" | "MONITOR"
-  >("MONITOR");
+  const [defenseMode, setDefenseMode] = useState<"MONITOR" | "ACTIVE">("MONITOR");
 
   useEffect(() => {
-    const fetchSummary = async () => {
-      const data = await apiGet<DashboardSummary>("/dashboard");
-      setSummary(data);
+    const fetchData = async () => {
+      try {
+        const dashboard = await apiGet<DashboardSummary>("/dashboard/");
+        setSummary(dashboard);
+
+        const settings = await apiGet<SettingsResponse>("/settings/");
+        setDefenseMode(settings.mode === "fail-closed" ? "ACTIVE" : "MONITOR");
+      } catch (err) {
+        console.error("Dashboard fetch failed", err);
+      }
     };
 
-    const fetchSettings = async () => {
-      const data = await apiGet<Settings>("/settings");
-
-      // Semantic mapping (IMPORTANT)
-      const mappedMode =
-        data.mode === "fail-closed" ? "ACTIVE" : "MONITOR";
-
-      setDefenseMode(mappedMode);
-    };
-
-    fetchSummary();
-    fetchSettings();
-
-    const summaryInterval = setInterval(fetchSummary, 5000);
-    const settingsInterval = setInterval(fetchSettings, 5000);
-
-    return () => {
-      clearInterval(summaryInterval);
-      clearInterval(settingsInterval);
-    };
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
