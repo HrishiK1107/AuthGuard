@@ -12,6 +12,7 @@ from backend.detection.signals import (
 from backend.detection.state_store import StateStore
 from backend.detection.decision_engine import DecisionEngine
 from backend.detection.shared import rules_manager
+from backend.alerts.manager import AlertManager
 
 
 GO_ENFORCER_URL = "http://localhost:8081/enforce"
@@ -20,12 +21,13 @@ GO_ENFORCER_URL = "http://localhost:8081/enforce"
 class EventProcessor:
     """
     Central orchestration engine.
-    Adds explainable enforcement telemetry.
+    Enforcement + Alert aware.
     """
 
     def __init__(self):
         self.state_store = StateStore()
         self.decision_engine = DecisionEngine()
+        self.alert_manager = AlertManager()
 
     def process(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         # 1. Ingest
@@ -95,7 +97,6 @@ class EventProcessor:
 
         # 5. Enforcement attempt
         enforcement_available = True
-
         try:
             enforcement_response = self._enforce(entity, base_decision)
         except Exception as e:
@@ -107,11 +108,10 @@ class EventProcessor:
 
         # 6. Mode-aware final decision
         final_decision = base_decision
-
         if base_decision == "BLOCK" and not enforcement_available:
             final_decision = "CHALLENGE" if mode == "fail-open" else "BLOCK"
 
-        # 7. Enforcement telemetry (NEW)
+        # 7. Enforcement telemetry
         enforcement_telemetry = {
             "decision": final_decision,
             "blocked_at": event.timestamp if final_decision == "BLOCK" else None,
@@ -120,7 +120,7 @@ class EventProcessor:
             "signals": triggered_signals
         }
 
-        # 8. Persist
+        # 8. Persist event
         append_event(
             ts=event.timestamp,
             entity=entity,
@@ -135,7 +135,21 @@ class EventProcessor:
             raw_event=raw_event,
         )
 
-        # 9. Response
+        # 9. ALERTING (D4.2 — single source of truth)
+        if final_decision == "BLOCK" or (
+            final_decision == "CHALLENGE" and effective_risk >= 50
+        ):
+            try:
+                self.alert_manager.emit(
+                    event=event,
+                    decision=final_decision,
+                    risk=effective_risk,
+                    signals=triggered_signals
+                )
+            except Exception:
+                pass  # alerts must NEVER break auth flow
+
+        # 10. Response
         return {
             "decision": final_decision,
             "risk_score": effective_risk,
