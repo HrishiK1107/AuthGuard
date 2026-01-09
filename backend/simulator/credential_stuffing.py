@@ -9,11 +9,6 @@ def credential_stuffing_attack(
     ip_address: str,
     delay: float = 0.3
 ):
-    """
-    Simulate credential stuffing attack:
-    One IP tries many usernames with few attempts each.
-    """
-
     print(f"[+] Starting credential stuffing from IP {ip_address}")
     print("-" * 60)
 
@@ -31,12 +26,23 @@ def credential_stuffing_attack(
             "ingest_source": "simulator-credstuff"
         }
 
-        response = requests.post(API_URL, json=payload)
-        result = response.json()
+        try:
+            response = requests.post(API_URL, json=payload, timeout=2)
 
-        decision = result["result"]["decision"]
-        risk = result["result"]["risk_score"]
-        reason = result["result"]["reason"]
+            if response.headers.get("content-type", "").startswith("application/json"):
+                result = response.json()
+                decision = result.get("result", {}).get("decision")
+                risk = result.get("result", {}).get("risk_score")
+                reason = result.get("result", {}).get("reason")
+            else:
+                decision = "UNKNOWN"
+                risk = "N/A"
+                reason = "Non-JSON response"
+
+        except Exception as e:
+            decision = "ERROR"
+            risk = "N/A"
+            reason = str(e)
 
         print(
             f"[User {i}: {username}] "
@@ -47,22 +53,3 @@ def credential_stuffing_attack(
 
     print("-" * 60)
     print("[+] Credential stuffing simulation complete")
-
-
-if __name__ == "__main__":
-    users = [
-        "alice",
-        "bob",
-        "charlie",
-        "david",
-        "emma",
-        "frank",
-        "grace",
-        "henry"
-    ]
-
-    credential_stuffing_attack(
-        usernames=users,
-        ip_address="10.0.0.99",
-        delay=0.3
-    )

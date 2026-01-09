@@ -10,10 +10,6 @@ def otp_bombing_attack(
     attempts: int = 8,
     delay: float = 0.4
 ):
-    """
-    Simulate OTP bombing attack against AuthGuard.
-    """
-
     print(f"[+] Starting OTP bombing on user '{username}' from IP {ip_address}")
     print("-" * 60)
 
@@ -31,12 +27,23 @@ def otp_bombing_attack(
             "ingest_source": "simulator-otp-bombing"
         }
 
-        response = requests.post(API_URL, json=payload)
-        result = response.json()
+        try:
+            response = requests.post(API_URL, json=payload, timeout=2)
 
-        decision = result["result"]["decision"]
-        risk = result["result"]["risk_score"]
-        reason = result["result"]["reason"]
+            if response.headers.get("content-type", "").startswith("application/json"):
+                result = response.json()
+                decision = result.get("result", {}).get("decision")
+                risk = result.get("result", {}).get("risk_score")
+                reason = result.get("result", {}).get("reason")
+            else:
+                decision = "UNKNOWN"
+                risk = "N/A"
+                reason = "Non-JSON response"
+
+        except Exception as e:
+            decision = "ERROR"
+            risk = "N/A"
+            reason = str(e)
 
         print(
             f"[Attempt {i}] "
@@ -47,12 +54,3 @@ def otp_bombing_attack(
 
     print("-" * 60)
     print("[+] OTP bombing simulation complete")
-
-
-if __name__ == "__main__":
-    otp_bombing_attack(
-        username="Jane Doe",
-        ip_address="10.0.0.77",
-        attempts=8,
-        delay=0.4
-    )
