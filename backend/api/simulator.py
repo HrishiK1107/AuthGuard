@@ -11,7 +11,7 @@ def simulate_bruteforce():
     try:
         brute_force_attack(
             username="admin",
-            ip_address="10.0.0.201",
+            ip_address="10.0.0.69",
             attempts=6,
             delay=0.2
         )
