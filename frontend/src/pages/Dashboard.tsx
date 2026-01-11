@@ -291,33 +291,44 @@ export default function Dashboard() {
         </Table>
       </div>
 
-      {/* =========================
-         Top Entities
+     {/* =========================
+         Top Active Entities (FIXED)
       ========================= */}
-      <div className="rounded border border-neutral-800 p-4">
-        <h2 className="text-sm font-medium text-neutral-300 mb-3">
+      <div>
+        <h2 className="text-sm font-medium text-neutral-300 mb-2">
           Top Active Entities
         </h2>
 
-        <ul className="space-y-2 text-sm">
-          {summary.top_entities.map((item) => (
-            <li
-              key={item.entity}
-              className="flex justify-between font-mono"
-            >
-              <span>{item.entity}</span>
-              <span className="text-neutral-400">
-                {item.count}
-              </span>
-            </li>
-          ))}
+        <Table headers={["Entity", "Event Count"]}>
+          {summary.top_entities.length === 0 ? (
+            <tr>
+              <td
+                colSpan={2}
+                className="px-4 py-6 text-center text-neutral-500 italic"
+              >
+                No active entities
+              </td>
+            </tr>
+          ) : (
+            summary.top_entities.map((item) => (
+              <tr
+                key={item.entity}
+                className="border-t border-neutral-800 hover:bg-neutral-800"
+              >
+                <td className="px-4 py-2 font-mono">
+                  {item.entity}
+                </td>
 
-          {summary.top_entities.length === 0 && (
-            <li className="text-neutral-500 italic">
-              No data
-            </li>
+                {/* FIX: padding buffer so numbers don’t kiss the wall */}
+                <td className="px-4 py-2">
+                  <div className="text-right font-mono pr-6">
+                    {item.count}
+                  </div>
+                </td>
+              </tr>
+            ))
           )}
-        </ul>
+        </Table>
       </div>
     </div>
   );

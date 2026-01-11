@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import Card from "../components/ui/Card";
 import Table from "../components/ui/Table";
 import StatusBadge from "../components/ui/StatusBadge";
 import { apiGet } from "../services/api";
@@ -6,303 +7,301 @@ import { apiGet } from "../services/api";
 /* =========================
    Types
 ========================= */
-type LogEvent = {
-  timestamp: number;
-  entity: string;
-  endpoint: string;
-  decision: "ALLOW" | "CHALLENGE" | "BLOCK";
-  risk?: number;
+
+type DashboardSummary = {
+  total_events: number;
+  decision_breakdown: Record<string, number>;
+  top_entities: { entity: string; count: number }[];
 };
 
-type BucketKey = "JUST_NOW" | "LAST_5_MIN" | "LAST_15_MIN" | "OLDER";
+type SettingsResponse = {
+  mode: "fail-open" | "fail-closed";
+};
+
+type ThreatEvent = {
+  entity: string;
+  decision: string;
+  risk: number;
+  endpoint: string;
+  timestamp: number;
+};
+
+type TimelineRow = {
+  hour: string;
+  ALLOW: number;
+  CHALLENGE: number;
+  BLOCK: number;
+};
+
+type MetricsResponse = {
+  mitigation_rate: {
+    blocked_percent: number;
+  };
+  threat_feed: ThreatEvent[];
+  timeline: TimelineRow[];
+  risk_distribution: {
+    low: number;
+    medium: number;
+    high: number;
+  };
+};
 
 /* =========================
-   Sparkline + Tooltip
+   Dashboard
 ========================= */
-function Sparkline({ values, log }: { values: number[]; log: LogEvent }) {
-  if (values.length < 2) return <span className="text-neutral-500">→</span>;
 
-  const width = 60;
-  const height = 16;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * width;
-    const y = height - ((v - min) / (max - min || 1)) * height;
-    return `${x},${y}`;
+export default function Dashboard() {
+  const [summary, setSummary] = useState<DashboardSummary>({
+    total_events: 0,
+    decision_breakdown: {},
+    top_entities: [],
   });
 
-  const trend =
-    values.at(-1)! > values[0]
-      ? "up"
-      : values.at(-1)! < values[0]
-      ? "down"
-      : "flat";
+  const [defenseMode, setDefenseMode] =
+    useState<"MONITOR" | "ACTIVE">("MONITOR");
 
-  const color =
-    trend === "up"
-      ? "#ef4444"
-      : trend === "down"
-      ? "#22c55e"
-      : "#a3a3a3";
+  const [blockedPercent, setBlockedPercent] =
+    useState<number | null>(null);
 
-  return (
-    <div className="relative group">
-      <svg width={width} height={height}>
-        <polyline
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          points={points.join(" ")}
-        />
-      </svg>
+  const [threats, setThreats] = useState<ThreatEvent[]>([]);
+  const [timeline, setTimeline] = useState<TimelineRow[]>([]);
+  const [riskDistribution, setRiskDistribution] = useState({
+    low: 0,
+    medium: 0,
+    high: 0,
+  });
 
-      <div className="pointer-events-none absolute z-20 hidden group-hover:block left-1/2 -translate-x-1/2 top-6 w-64 rounded border border-neutral-700 bg-neutral-900 p-3 text-xs text-neutral-200 shadow-lg">
-        <div className="space-y-1">
-          <div className="font-semibold text-neutral-100">
-            Entity: {log.entity}
-          </div>
-          <div>Decision: <span className="font-mono">{log.decision}</span></div>
-          <div>Risk: <span className="font-mono">{log.risk?.toFixed(2) ?? "0.00"}</span></div>
-          <div>Endpoint: <span className="font-mono">{log.endpoint}</span></div>
-          <div>Time: {new Date(log.timestamp).toLocaleString()}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================
-   Logs Page
-========================= */
-export default function Logs() {
-  const [logs, setLogs] = useState<LogEvent[]>([]);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
-
-  /* ---------- Filters ---------- */
-  const [entityFilter, setEntityFilter] = useState("");
-  const [decisionFilter, setDecisionFilter] =
-    useState<"ALL" | LogEvent["decision"]>("ALL");
-  const [endpointFilter, setEndpointFilter] = useState<"ALL" | string>("ALL");
-
-  /* ---------- Fetch logs ---------- */
   useEffect(() => {
-    const fetchLogs = () => {
-      apiGet<{ results: LogEvent[] }>("/logs/")
-        .then((d) => setLogs(d.results));
+    const fetchData = async () => {
+      try {
+        const dashboard =
+          await apiGet<DashboardSummary>("/dashboard/");
+        setSummary(dashboard);
+
+        const settings =
+          await apiGet<SettingsResponse>("/settings/");
+        setDefenseMode(
+          settings.mode === "fail-closed" ? "ACTIVE" : "MONITOR"
+        );
+
+        const metrics =
+          await apiGet<MetricsResponse>("/dashboard/metrics");
+
+        setBlockedPercent(
+          metrics.mitigation_rate.blocked_percent
+        );
+        setThreats(metrics.threat_feed);
+        setTimeline(metrics.timeline);
+        setRiskDistribution(metrics.risk_distribution);
+      } catch (err) {
+        console.error("Dashboard fetch failed", err);
+      }
     };
 
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 5000);
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  /* ---------- Filtering ---------- */
-  const filteredLogs = useMemo(() => {
-    return logs.filter((l) => {
-      if (entityFilter && !l.entity.toLowerCase().includes(entityFilter.toLowerCase()))
-        return false;
-      if (decisionFilter !== "ALL" && l.decision !== decisionFilter)
-        return false;
-      if (endpointFilter !== "ALL" && l.endpoint !== endpointFilter)
-        return false;
-      return true;
-    });
-  }, [logs, entityFilter, decisionFilter, endpointFilter]);
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <p className="text-sm text-neutral-400">
+          Real-time security overview and system status.
+        </p>
+      </div>
 
-  /* ---------- CSV Export ---------- */
-  const exportCSV = () => {
-    const header = ["timestamp", "entity", "endpoint", "decision", "risk"];
-    const rows = filteredLogs.map((l) => [
-      new Date(l.timestamp).toISOString(),
-      l.entity,
-      l.endpoint,
-      l.decision,
-      l.risk ?? 0,
-    ]);
+      {/* =========================
+         Top Stats
+      ========================= */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card title="Total Events">
+          <span className="text-2xl font-bold">
+            {summary.total_events}
+          </span>
+        </Card>
 
-    const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
+        <Card title="Blocked Events">
+          <span className="text-2xl font-bold text-red-500">
+            {summary.decision_breakdown["BLOCK"] ?? 0}
+          </span>
+        </Card>
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `authguard-logs-${Date.now()}.csv`;
-    a.click();
+        <Card title="Mitigation Rate">
+          <span className="text-2xl font-bold text-orange-400">
+            {blockedPercent !== null
+              ? `${blockedPercent}%`
+              : "—"}
+          </span>
+        </Card>
 
-    URL.revokeObjectURL(url);
-  };
+        <Card title="Defense Mode">
+          <span
+            className={`text-2xl font-bold ${
+              defenseMode === "ACTIVE"
+                ? "text-green-500"
+                : "text-yellow-400"
+            }`}
+          >
+            {defenseMode}
+          </span>
+        </Card>
+      </div>
 
-  /* ---------- Endpoint list ---------- */
-  const endpoints = useMemo(
-    () => Array.from(new Set(logs.map((l) => l.endpoint))),
-    [logs]
-  );
+      {/* =========================
+         Decision Timeline
+      ========================= */}
+      <div>
+        <h2 className="text-sm font-medium text-neutral-300 mb-2">
+          Decision Timeline (Hourly)
+        </h2>
 
-  /* ---------- Risk history ---------- */
-  const riskHistory = useMemo(() => {
-    const map: Record<string, number[]> = {};
-    [...filteredLogs]
-      .sort((a, b) => a.timestamp - b.timestamp)
-      .forEach((l) => {
-        map[l.entity] ??= [];
-        map[l.entity].push(l.risk ?? 0);
-        if (map[l.entity].length > 10) map[l.entity].shift();
-      });
-    return map;
-  }, [filteredLogs]);
-
-  /* ---------- Time buckets ---------- */
-  const buckets = useMemo(() => {
-    const now = Date.now();
-    const b: Record<BucketKey, LogEvent[]> = {
-      JUST_NOW: [],
-      LAST_5_MIN: [],
-      LAST_15_MIN: [],
-      OLDER: [],
-    };
-
-    for (const l of filteredLogs) {
-      const age = (now - l.timestamp) / 1000;
-      if (age <= 60) b.JUST_NOW.push(l);
-      else if (age <= 300) b.LAST_5_MIN.push(l);
-      else if (age <= 900) b.LAST_15_MIN.push(l);
-      else b.OLDER.push(l);
-    }
-    return b;
-  }, [filteredLogs]);
-
-  /* ---------- Row renderer ---------- */
-  const renderBucket = (title: string, rows: LogEvent[]) => {
-    if (!rows.length) return null;
-
-    return (
-      <>
-        <tr>
-          <td colSpan={6} className="px-4 py-2 text-xs font-semibold uppercase bg-neutral-900 text-neutral-400">
-            {title}
-          </td>
-        </tr>
-
-        {rows.map((l, i) => {
-          const key = `${l.timestamp}-${i}`;
-          const expanded = expandedKey === key;
-
-          return (
-            <>
-              <tr
-                key={key}
-                onClick={() => setExpandedKey(expanded ? null : key)}
-                className="border-t border-neutral-800 hover:bg-neutral-800 cursor-pointer"
+        <Table headers={["Hour", "ALLOW", "CHALLENGE", "BLOCK"]}>
+          {timeline.length === 0 ? (
+            <tr>
+              <td
+                colSpan={4}
+                className="px-4 py-6 text-center text-neutral-500 italic"
               >
-                <td className="px-4 py-2">{new Date(l.timestamp).toLocaleString()}</td>
-                <td className="px-4 py-2 font-mono">{l.entity}</td>
-                <td className="px-4 py-2">{l.endpoint}</td>
-                <td className="px-4 py-2">
-                  <StatusBadge
-                    label={l.decision}
-                    status={
-                      l.decision === "BLOCK"
-                        ? "high"
-                        : l.decision === "CHALLENGE"
-                        ? "medium"
-                        : "low"
-                    }
-                  />
+                No timeline data
+              </td>
+            </tr>
+          ) : (
+            timeline.map((row) => (
+              <tr
+                key={row.hour}
+                className="border-t border-neutral-800 hover:bg-neutral-800"
+              >
+                <td className="px-4 py-2 font-mono">
+                  {row.hour}
                 </td>
-                <td className="px-4 py-2 font-mono">{l.risk?.toFixed(2) ?? "-"}</td>
                 <td className="px-4 py-2">
-                  <Sparkline values={riskHistory[l.entity] || []} log={l} />
+                  <StatusBadge label={String(row.ALLOW)} status="low" />
+                </td>
+                <td className="px-4 py-2">
+                  <StatusBadge label={String(row.CHALLENGE)} status="medium" />
+                </td>
+                <td className="px-4 py-2">
+                  <StatusBadge label={String(row.BLOCK)} status="high" />
                 </td>
               </tr>
-
-              {expanded && (
-                <tr className="bg-neutral-950 border-t border-neutral-800">
-                  <td colSpan={6} className="px-6 py-4 text-xs text-neutral-300 w-full">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono w-full">
-                      <div><span className="text-neutral-500">Entity:</span> {l.entity}</div>
-                      <div><span className="text-neutral-500">Endpoint:</span> {l.endpoint}</div>
-                      <div><span className="text-neutral-500">Decision:</span> {l.decision}</div>
-                      <div><span className="text-neutral-500">Risk:</span> {l.risk?.toFixed(2) ?? "0.00"}</div>
-                      <div className="md:col-span-2">
-                        <span className="text-neutral-500">Timestamp:</span>{" "}
-                        {new Date(l.timestamp).toISOString()}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </>
-          );
-        })}
-      </>
-    );
-  };
-
-  /* =========================
-     UI
-  ========================= */
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-lg font-semibold">Logs & Events</h1>
-        <button
-          onClick={exportCSV}
-          className="px-3 py-1 text-sm rounded bg-neutral-800 border border-neutral-700 hover:bg-neutral-700"
-        >
-          Export CSV
-        </button>
+            ))
+          )}
+        </Table>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 text-sm">
-        <input
-          value={entityFilter}
-          onChange={(e) => setEntityFilter(e.target.value)}
-          placeholder="Filter entity"
-          className="px-4 py-2 w-64 md:w-72 rounded bg-neutral-900 border border-neutral-700"
-        />
+      {/* =========================
+         Risk Distribution
+      ========================= */}
+      <div>
+        <h2 className="text-sm font-medium text-neutral-300 mb-2">
+          Risk Distribution
+        </h2>
 
-        <select
-          value={decisionFilter}
-          onChange={(e) => setDecisionFilter(e.target.value as any)}
-          className="px-3 py-2 rounded bg-neutral-900 border border-neutral-700"
-        >
-          <option value="ALL">All decisions</option>
-          <option value="ALLOW">ALLOW</option>
-          <option value="CHALLENGE">CHALLENGE</option>
-          <option value="BLOCK">BLOCK</option>
-        </select>
-
-        <select
-          value={endpointFilter}
-          onChange={(e) => setEndpointFilter(e.target.value)}
-          className="px-3 py-2 rounded bg-neutral-900 border border-neutral-700"
-        >
-          <option value="ALL">All endpoints</option>
-          {endpoints.map((ep) => (
-            <option key={ep} value={ep}>{ep}</option>
-          ))}
-        </select>
-      </div>
-
-      <Table headers={["Timestamp", "Entity", "Endpoint", "Decision", "Risk", "Trend"]}>
-        {!filteredLogs.length ? (
-          <tr>
-            <td colSpan={6} className="px-4 py-6 text-center text-neutral-500 italic">
-              No log data
+        <Table headers={["Risk Level", "Events", "Severity"]}>
+          <tr className="border-t border-neutral-800">
+            <td className="px-4 py-2 font-mono">LOW</td>
+            <td className="px-4 py-2">{riskDistribution.low}</td>
+            <td className="px-4 py-2">
+              <StatusBadge label="LOW" status="low" />
             </td>
           </tr>
-        ) : (
-          <>
-            {renderBucket("Just now", buckets.JUST_NOW)}
-            {renderBucket("Last 5 minutes", buckets.LAST_5_MIN)}
-            {renderBucket("Last 15 minutes", buckets.LAST_15_MIN)}
-            {renderBucket("Older", buckets.OLDER)}
-          </>
-        )}
-      </Table>
+
+          <tr className="border-t border-neutral-800">
+            <td className="px-4 py-2 font-mono">MEDIUM</td>
+            <td className="px-4 py-2">{riskDistribution.medium}</td>
+            <td className="px-4 py-2">
+              <StatusBadge label="MEDIUM" status="medium" />
+            </td>
+          </tr>
+
+          <tr className="border-t border-neutral-800">
+            <td className="px-4 py-2 font-mono">HIGH</td>
+            <td className="px-4 py-2">{riskDistribution.high}</td>
+            <td className="px-4 py-2">
+              <StatusBadge label="HIGH" status="high" />
+            </td>
+          </tr>
+        </Table>
+      </div>
+
+      {/* =========================
+         Recent Threats
+      ========================= */}
+      <div>
+        <h2 className="text-sm font-medium text-neutral-300 mb-2">
+          Recent Threats (Blocked)
+        </h2>
+
+        <Table headers={["Time", "Entity", "Endpoint", "Risk", "Decision"]}>
+          {threats.length === 0 ? (
+            <tr>
+              <td
+                colSpan={5}
+                className="px-4 py-6 text-center text-neutral-500 italic"
+              >
+                No active threats
+              </td>
+            </tr>
+          ) : (
+            threats.map((t, i) => (
+              <tr
+                key={i}
+                className="border-t border-neutral-800 hover:bg-neutral-800"
+              >
+                <td className="px-4 py-2">
+                  {new Date(t.timestamp).toLocaleString()}
+                </td>
+                <td className="px-4 py-2 font-mono">{t.entity}</td>
+                <td className="px-4 py-2">{t.endpoint}</td>
+                <td className="px-4 py-2 font-mono">
+                  {t.risk.toFixed(2)}
+                </td>
+                <td className="px-4 py-2">
+                  <StatusBadge label={t.decision} status="high" />
+                </td>
+              </tr>
+            ))
+          )}
+        </Table>
+      </div>
+
+      {/* =========================
+         Top Active Entities (TABLE)
+      ========================= */}
+      <div>
+        <h2 className="text-sm font-medium text-neutral-300 mb-2">
+          Top Active Entities
+        </h2>
+
+        <Table headers={["Entity", "Event Count"]}>
+          {summary.top_entities.length === 0 ? (
+            <tr>
+              <td
+                colSpan={2}
+                className="px-4 py-6 text-center text-neutral-500 italic"
+              >
+                No active entities
+              </td>
+            </tr>
+          ) : (
+            summary.top_entities.map((item) => (
+              <tr
+                key={item.entity}
+                className="border-t border-neutral-800 hover:bg-neutral-800"
+              >
+                <td className="px-4 py-2 font-mono">
+                  {item.entity}
+                </td>
+                <td className="px-4 py-2 font-mono text-right">
+                  {item.count}
+                </td>
+              </tr>
+            ))
+          )}
+        </Table>
+      </div>
     </div>
   );
 }
