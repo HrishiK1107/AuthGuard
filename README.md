@@ -10,8 +10,8 @@ It focuses on **correctness, explainability, and operational safety**, rather th
 
 ## Visual Documentation
 
-<img width="1920" height="860" alt="2026-01-11 13 34 06" src="https://github.com/user-attachments/assets/65402cea-d4ed-41b4-89bd-8aa661e2e19e" />
-<img width="1920" height="936" alt="2026-01-12 00 35 09" src="https://github.com/user-attachments/assets/46cba8df-5ee0-4b93-a118-88ee56cc72b7" />
+<img width="1898" height="860" alt="2026-01-11 13 34 06" src="https://github.com/user-attachments/assets/d36d41d7-298e-4604-b2f5-a8169dc93998" />
+<img width="1896" height="936" alt="2026-01-12 00 35 09" src="https://github.com/user-attachments/assets/15cd741f-c61c-4a48-9c47-159d451007a2" />
 <img width="1560" height="576" alt="2026-01-12 00 36 24" src="https://github.com/user-attachments/assets/004d4cf5-0b77-4fe0-9399-873e37cb3ae7" />
 
 ---
