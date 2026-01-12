@@ -33,7 +33,7 @@ Decisions are temporary, reversible, and resilient to infrastructure failures.
 
 ## System Architecture
 
-<img width="1024" height="1024" alt="Architecture Diagram" src="https://github.com/user-attachments/assets/da70785b-01a6-4c07-980f-190a2e5bad1d" />
+<img width="1024" height="1024" alt="Architecture Diagram" src="https://github.com/user-attachments/assets/1efb5c08-bcf8-49bf-9e9a-d22a06286746" />
 
 ---
 
