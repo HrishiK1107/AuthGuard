@@ -11,36 +11,46 @@ class Decision(Enum):
 
 class DecisionEngine:
     """
-    Maps risk scores to enforcement decisions.
+    Pure decision engine.
+
+    Maps effective risk score to a decision
+    using a policy-defined threshold set.
     """
 
     def __init__(
         self,
-        monitor_threshold: float = 10,
-        challenge_threshold: float = 25,
-        block_threshold: float = 50
+        monitor_threshold: float = 10.0,
+        challenge_threshold: float = 25.0,
+        block_threshold: float = 50.0,
     ):
-        self.monitor_threshold = monitor_threshold
-        self.challenge_threshold = challenge_threshold
-        self.block_threshold = block_threshold
+        # Policy (immutable after init)
+        self._policy = {
+            Decision.BLOCK: block_threshold,
+            Decision.CHALLENGE: challenge_threshold,
+            Decision.MONITOR: monitor_threshold,
+        }
 
     def decide(self, risk_score: float) -> Dict[str, str]:
         """
-        Decide action based on current risk score.
+        Pure mapping: risk_score -> decision.
+
+        No I/O
+        No state mutation
+        Deterministic output
         """
-        if risk_score >= self.block_threshold:
+        if risk_score >= self._policy[Decision.BLOCK]:
             return {
                 "decision": Decision.BLOCK.value,
                 "reason": f"Risk score {risk_score} exceeds block threshold"
             }
 
-        if risk_score >= self.challenge_threshold:
+        if risk_score >= self._policy[Decision.CHALLENGE]:
             return {
                 "decision": Decision.CHALLENGE.value,
                 "reason": f"Risk score {risk_score} requires verification"
             }
 
-        if risk_score >= self.monitor_threshold:
+        if risk_score >= self._policy[Decision.MONITOR]:
             return {
                 "decision": Decision.MONITOR.value,
                 "reason": f"Risk score {risk_score} indicates suspicious behavior"
