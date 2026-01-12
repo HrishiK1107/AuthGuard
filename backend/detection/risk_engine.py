@@ -1,24 +1,37 @@
-import time
+import math
 from typing import Dict
 
 
 class RiskEngine:
     """
-    Aggregates signal scores over time and applies decay.
+    Risk Engine v2
+
+    - Entity-aware
+    - Exponential decay
+    - Deterministic cooling
     """
 
-    def __init__(self, decay_rate_per_sec: float = 0.1):
+    def __init__(
+        self,
+        half_life_sec: int = 300,
+        max_risk: float = 100.0,
+    ):
         """
-        decay_rate_per_sec:
-        How much risk decays every second.
-        Example: 0.1 means 10% per second.
+        half_life_sec:
+            Time for risk to reduce by 50%
+
+        max_risk:
+            Upper bound for risk per entity
         """
-        self.decay_rate = decay_rate_per_sec
+        self.half_life_sec = half_life_sec
+        self.max_risk = max_risk
+
+        # key -> { score, last_updated }
         self.risk_store: Dict[str, Dict[str, float]] = {}
 
     def add_signal(self, key: str, score: float, timestamp: int) -> None:
         """
-        Add signal score for a given entity (IP, user, etc.)
+        Add signal score for an entity.
         """
         now_sec = timestamp / 1000
 
@@ -29,11 +42,13 @@ class RiskEngine:
             }
 
         self._apply_decay(key, now_sec)
-        self.risk_store[key]["score"] += score
+
+        new_score = self.risk_store[key]["score"] + score
+        self.risk_store[key]["score"] = min(self.max_risk, new_score)
 
     def get_risk(self, key: str, timestamp: int) -> float:
         """
-        Get current risk score for a key.
+        Get current risk score for an entity.
         """
         if key not in self.risk_store:
             return 0.0
@@ -45,7 +60,7 @@ class RiskEngine:
 
     def _apply_decay(self, key: str, now_sec: float) -> None:
         """
-        Reduce risk score based on time passed.
+        Apply exponential decay to risk score.
         """
         entry = self.risk_store[key]
         elapsed = now_sec - entry["last_updated"]
@@ -53,6 +68,9 @@ class RiskEngine:
         if elapsed <= 0:
             return
 
-        decay_amount = elapsed * self.decay_rate
-        entry["score"] = max(0.0, entry["score"] - decay_amount)
+        # Exponential decay formula:
+        # score = score * (0.5 ^ (elapsed / half_life))
+        decay_factor = math.pow(0.5, elapsed / self.half_life_sec)
+
+        entry["score"] *= decay_factor
         entry["last_updated"] = now_sec
