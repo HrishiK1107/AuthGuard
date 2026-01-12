@@ -14,6 +14,7 @@ from backend.detection.state_store import StateStore
 from backend.detection.decision_engine import DecisionEngine
 from backend.detection.shared import rules_manager
 from backend.alerts.manager import AlertManager
+from backend.storage.block_store import load_blocks, save_blocks
 
 
 GO_ENFORCER_URL = "http://localhost:8081/enforce"
@@ -21,10 +22,13 @@ GO_ENFORCER_URL = "http://localhost:8081/enforce"
 
 class EventProcessor:
     """
-    Central orchestration engine.
-    Enforcement + Alert aware.
-    Campaign-aware (v2).
-    Observability-instrumented (v2.4).
+    Central orchestration engine (v2).
+
+    Guarantees:
+    - Signal deduplication
+    - Deterministic risk accumulation
+    - Signal-driven campaign attribution
+    - Durable BLOCK persistence
     """
 
     def __init__(self):
@@ -32,32 +36,25 @@ class EventProcessor:
         self.decision_engine = DecisionEngine()
         self.alert_manager = AlertManager()
 
-    def _derive_campaign(self, event: AuthEvent) -> Dict[str, str]:
-        """
-        Lightweight campaign derivation.
-        Full campaign engine comes later.
-        """
-        if event.username:
-            return {
-                "campaign_id": f"USER::{event.username}",
-                "campaign_type": "USER"
-            }
-
+    def _derive_campaign(self, entity: str, entity_type: str) -> Dict[str, str]:
         return {
-            "campaign_id": f"IP::{event.ip_address}",
-            "campaign_type": "IP"
+            "campaign_id": f"{entity_type}::{entity}",
+            "campaign_type": entity_type
         }
 
     def process(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         processing_started_at = time.time()
 
+        # =========================
         # 1. Ingest
+        # =========================
         event: AuthEvent = ingest_event(raw_event)
         triggered_signals: List[Dict[str, Any]] = []
 
-        campaign = self._derive_campaign(event)
-
+        # =========================
         # 2. Signals
+        # =========================
+
         if rules_manager.is_enabled("failed_login_velocity"):
             r = failed_login_velocity(
                 event,
@@ -65,13 +62,16 @@ class EventProcessor:
                 threshold=rules_manager.get_threshold("failed_login_velocity")
             )
             if r.get("triggered"):
-                r["campaign"] = campaign
+                r["campaign"] = self._derive_campaign(r["entity"], r["entity_type"])
                 triggered_signals.append(r)
-                self.state_store.get_risk_engine().add_signal(
-                    key=event.ip_address,
-                    score=r["score"],
-                    timestamp=event.timestamp
-                )
+
+                if not self.state_store.is_signal_active(r["signal_id"], r["entity"]):
+                    self.state_store.mark_signal_active(r["signal_id"], r["entity"])
+                    self.state_store.get_risk_engine().add_signal(
+                        key=r["entity"],
+                        score=r["score"],
+                        timestamp=event.timestamp
+                    )
 
         if rules_manager.is_enabled("ip_fan_out"):
             r = ip_fan_out(
@@ -80,30 +80,38 @@ class EventProcessor:
                 threshold=rules_manager.get_threshold("ip_fan_out")
             )
             if r.get("triggered"):
-                r["campaign"] = campaign
+                r["campaign"] = self._derive_campaign(r["entity"], r["entity_type"])
                 triggered_signals.append(r)
-                self.state_store.get_risk_engine().add_signal(
-                    key=event.ip_address,
-                    score=r["score"],
-                    timestamp=event.timestamp
-                )
 
-        if rules_manager.is_enabled("user_fan_in"):
+                if not self.state_store.is_signal_active(r["signal_id"], r["entity"]):
+                    self.state_store.mark_signal_active(r["signal_id"], r["entity"])
+                    self.state_store.get_risk_engine().add_signal(
+                        key=r["entity"],
+                        score=r["score"],
+                        timestamp=event.timestamp
+                    )
+
+        if rules_manager.is_enabled("user_fan_in") and event.username:
             r = user_fan_in(
                 event,
                 self.state_store.get_user_ip_window(),
                 threshold=rules_manager.get_threshold("user_fan_in")
             )
-            if r.get("triggered") and event.username:
-                r["campaign"] = campaign
+            if r.get("triggered"):
+                r["campaign"] = self._derive_campaign(r["entity"], r["entity_type"])
                 triggered_signals.append(r)
-                self.state_store.get_risk_engine().add_signal(
-                    key=event.username,
-                    score=r["score"],
-                    timestamp=event.timestamp
-                )
 
-        # 3. Risk
+                if not self.state_store.is_signal_active(r["signal_id"], r["entity"]):
+                    self.state_store.mark_signal_active(r["signal_id"], r["entity"])
+                    self.state_store.get_risk_engine().add_signal(
+                        key=r["entity"],
+                        score=r["score"],
+                        timestamp=event.timestamp
+                    )
+
+        # =========================
+        # 3. Risk Evaluation
+        # =========================
         ip_risk = self.state_store.get_risk_engine().get_risk(
             event.ip_address, event.timestamp
         )
@@ -115,7 +123,9 @@ class EventProcessor:
 
         decision_made_at = time.time()
 
-        # 4. Base decision
+        # =========================
+        # 4. Base Decision
+        # =========================
         decision_obj = self.decision_engine.decide(effective_risk)
         base_decision = decision_obj["decision"]
         reason = decision_obj["reason"]
@@ -123,7 +133,9 @@ class EventProcessor:
         mode = RUNTIME_SETTINGS.get("mode", "fail-open")
         entity = event.ip_address or event.username
 
-        # 5. Enforcement attempt
+        # =========================
+        # 5. Enforcement Attempt
+        # =========================
         enforcement_available = True
         enforcement_started_at = time.time()
         try:
@@ -136,18 +148,41 @@ class EventProcessor:
             }
         enforcement_completed_at = time.time()
 
-        # 6. Mode-aware final decision
+        # =========================
+        # 6. Mode-Aware Final Decision
+        # =========================
         final_decision = base_decision
         if base_decision == "BLOCK" and not enforcement_available:
             final_decision = "CHALLENGE" if mode == "fail-open" else "BLOCK"
 
-        # 7. Enforcement telemetry (observability added)
+        # =========================
+        # 7. PERSIST BLOCK (v2-critical)
+        # =========================
+        if final_decision == "BLOCK":
+            blocks = load_blocks()
+
+            if not any(b.get("entity") == entity and b.get("active", True) for b in blocks):
+                blocks.append({
+                    "id": f"auto::{entity}",
+                    "entity": entity,
+                    "scope": "auth",
+                    "decision": "HARD_BLOCK",
+                    "risk": effective_risk,
+                    "ttl_seconds": 300,
+                    "active": True,
+                    "source": "auto",
+                    "created_at": event.timestamp
+                })
+                save_blocks(blocks)
+
+        # =========================
+        # 8. Enforcement Telemetry
+        # =========================
         enforcement_telemetry = {
             "decision": final_decision,
             "blocked_at": event.timestamp if final_decision == "BLOCK" else None,
             "ttl_seconds": 300 if final_decision == "BLOCK" else 0,
             "risk_score": effective_risk,
-            "campaign": campaign,
             "signals": triggered_signals,
             "latency": {
                 "decision_ms": round((decision_made_at - processing_started_at) * 1000, 2),
@@ -156,7 +191,9 @@ class EventProcessor:
             }
         }
 
-        # 8. Persist event
+        # =========================
+        # 9. Persist Event
+        # =========================
         append_event(
             ts=event.timestamp,
             entity=entity,
@@ -171,7 +208,9 @@ class EventProcessor:
             raw_event=raw_event,
         )
 
-        # 9. ALERTING
+        # =========================
+        # 10. Alerting
+        # =========================
         if final_decision == "BLOCK" or (
             final_decision == "CHALLENGE" and effective_risk >= 50
         ):
@@ -181,16 +220,17 @@ class EventProcessor:
                     decision=final_decision,
                     risk=effective_risk,
                     signals=triggered_signals,
-                    campaign=campaign
+                    campaign=None
                 )
             except Exception:
                 pass
 
-        # 10. Response
+        # =========================
+        # 11. Response
+        # =========================
         return {
             "decision": final_decision,
             "risk_score": effective_risk,
-            "campaign": campaign,
             "signals_triggered": triggered_signals,
             "decision_reason": reason,
             "mode": mode,

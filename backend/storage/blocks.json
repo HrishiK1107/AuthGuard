@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "auto::3.3.3.3",
+    "entity": "3.3.3.3",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": 69.9307652958107,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "auto",
+    "created_at": 1700003001000
+  }
+]
