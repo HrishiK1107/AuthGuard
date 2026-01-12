@@ -33,7 +33,57 @@ Decisions are temporary, reversible, and resilient to infrastructure failures.
 
 ## System Architecture
 
-<img width="1024" height="1024" alt="Architecture Diagram" src="https://github.com/user-attachments/assets/1efb5c08-bcf8-49bf-9e9a-d22a06286746" />
+```
+Client / Simulator
+        |
+        v
++--------------------+
+| FastAPI Ingest API |
+|  (/events/auth)   |
++--------------------+
+        |
+        v
++------------------------+
+| Event Normalization    |
+| (Raw → Canonical)      |
++------------------------+
+        |
+        v
++------------------------+
+| Detection Engine       |
+| - Signals              |
+| - Sliding Windows      |
++------------------------+
+        |
+        v
++------------------------+
+| Risk Engine            |
+| - Decay                |
+| - Aggregation          |
++------------------------+
+        |
+        v
++------------------------+
+| Decision Engine        |
+| - ALLOW / CHALLENGE / |
+|   BLOCK                |
++------------------------+
+        |
+        +--------------------+
+        |                    |
+        v                    v
++----------------+    +-------------------+
+| Go Enforcer    |    | Alerting Engine   |
+| (rate control) |    | (webhook/Slack)   |
++----------------+    +-------------------+
+        |
+        v
++------------------------+
+| Persistent Storage     |
+| (SQLite event_log)     |
++------------------------+
+
+```
 
 ---
 
