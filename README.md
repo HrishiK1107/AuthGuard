@@ -8,6 +8,14 @@ It focuses on **correctness, explainability, and operational safety**, rather th
 
 ---
 
+## Visual Documentation
+
+<img width="1898" height="860" alt="2026-01-11 13 34 06" src="https://github.com/user-attachments/assets/d36d41d7-298e-4604-b2f5-a8169dc93998" />
+<img width="1896" height="936" alt="2026-01-12 00 35 09" src="https://github.com/user-attachments/assets/15cd741f-c61c-4a48-9c47-159d451007a2" />
+<img width="1560" height="576" alt="2026-01-12 00 36 24" src="https://github.com/user-attachments/assets/004d4cf5-0b77-4fe0-9399-873e37cb3ae7" />
+
+---
+
 ## Overview
 
 Authentication endpoints are a primary attack surface for:
@@ -20,6 +28,62 @@ Authentication endpoints are a primary attack surface for:
 AuthGuard observes authentication activity, evaluates behavioral patterns over time, and produces **deterministic, explainable enforcement decisions**.
 
 Decisions are temporary, reversible, and resilient to infrastructure failures.
+
+---
+
+## System Architecture
+
+```
+Client / Simulator
+        |
+        v
++--------------------+
+| FastAPI Ingest API |
+|  (/events/auth)   |
++--------------------+
+        |
+        v
++------------------------+
+| Event Normalization    |
+| (Raw → Canonical)      |
++------------------------+
+        |
+        v
++------------------------+
+| Detection Engine       |
+| - Signals              |
+| - Sliding Windows      |
++------------------------+
+        |
+        v
++------------------------+
+| Risk Engine            |
+| - Decay                |
+| - Aggregation          |
++------------------------+
+        |
+        v
++------------------------+
+| Decision Engine        |
+| - ALLOW / CHALLENGE / |
+|   BLOCK                |
++------------------------+
+        |
+        +--------------------+
+        |                    |
+        v                    v
++----------------+    +-------------------+
+| Go Enforcer    |    | Alerting Engine   |
+| (rate control) |    | (webhook/Slack)   |
++----------------+    +-------------------+
+        |
+        v
++------------------------+
+| Persistent Storage     |
+| (SQLite event_log)     |
++------------------------+
+
+```
 
 ---
 
@@ -175,60 +239,6 @@ These simulators validate:
 
 ---
 
-## System Architecture
-
-```
-Client / Simulator
-        |
-        v
-+--------------------+
-| FastAPI Ingest API |
-|  (/events/auth)   |
-+--------------------+
-        |
-        v
-+------------------------+
-| Event Normalization    |
-| (Raw → Canonical)      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Detection Engine       |
-| - Signals              |
-| - Sliding Windows      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Risk Engine            |
-| - Decay                |
-| - Aggregation          |
-+------------------------+
-        |
-        v
-+------------------------+
-| Decision Engine        |
-| - ALLOW / CHALLENGE / |
-|   BLOCK                |
-+------------------------+
-        |
-        +--------------------+
-        |                    |
-        v                    v
-+----------------+    +-------------------+
-| Go Enforcer    |    | Alerting Engine   |
-| (rate control) |    | (webhook/Slack)   |
-+----------------+    +-------------------+
-        |
-        v
-+------------------------+
-| Persistent Storage     |
-| (SQLite event_log)     |
-+------------------------+
-
-```
-
 Detection and enforcement are **intentionally decoupled**.
 
 ---
@@ -321,18 +331,6 @@ MIT
 
 ---
 
-## Visual Documentation
-
-> Add screenshots and diagrams here:
-
-```
-[ PLACEHOLDER: System architecture diagram ]
-[ PLACEHOLDER: Dashboard overview ]
-[ PLACEHOLDER: Logs & decisions view ]
-[ PLACEHOLDER: Threat feed ]
-```
-
----
 
 ### Final Note
 
