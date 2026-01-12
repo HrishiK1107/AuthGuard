@@ -33,57 +33,8 @@ Decisions are temporary, reversible, and resilient to infrastructure failures.
 
 ## System Architecture
 
-```
-Client / Simulator
-        |
-        v
-+--------------------+
-| FastAPI Ingest API |
-|  (/events/auth)   |
-+--------------------+
-        |
-        v
-+------------------------+
-| Event Normalization    |
-| (Raw → Canonical)      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Detection Engine       |
-| - Signals              |
-| - Sliding Windows      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Risk Engine            |
-| - Decay                |
-| - Aggregation          |
-+------------------------+
-        |
-        v
-+------------------------+
-| Decision Engine        |
-| - ALLOW / CHALLENGE / |
-|   BLOCK                |
-+------------------------+
-        |
-        +--------------------+
-        |                    |
-        v                    v
-+----------------+    +-------------------+
-| Go Enforcer    |    | Alerting Engine   |
-| (rate control) |    | (webhook/Slack)   |
-+----------------+    +-------------------+
-        |
-        v
-+------------------------+
-| Persistent Storage     |
-| (SQLite event_log)     |
-+------------------------+
+<img width="1024" height="1024" alt="Architecture Diagram" src="https://github.com/user-attachments/assets/da70785b-01a6-4c07-980f-190a2e5bad1d" />
 
-```
 ---
 
 ## Core Capabilities
