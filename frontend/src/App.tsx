@@ -7,6 +7,7 @@ import DetectionRules from './pages/DetectionRules'
 import ActiveBlocks from './pages/ActiveBlocks'
 import AttackSimulator from './pages/AttackSimulator'
 import Settings from './pages/Settings'
+import DecisionExplorer from './pages/DecisionExplorer'
 
 export default function App() {
   return (
@@ -22,6 +23,9 @@ export default function App() {
         <Route path="/blocks" element={<ActiveBlocks />} />
         <Route path="/simulator" element={<AttackSimulator />} />
         <Route path="/settings" element={<Settings />} />
+
+        {/* Phase 6.2 — Decision Explorer */}
+        <Route path="/decision/:eventId" element={<DecisionExplorer />} />
       </Route>
     </Routes>
   )

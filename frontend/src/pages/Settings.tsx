@@ -1,120 +1,208 @@
 import { useEffect, useState } from "react";
 import Card from "../components/ui/Card";
-import { apiGet } from "../services/api";
+import StatusBadge from "../components/ui/StatusBadge";
+import Table from "../components/ui/Table";
+import EmptyState from "../components/ui/EmptyState";
+import { apiGet, apiPost } from "../services/api";
+
+/* =========================
+   Types
+========================= */
+
+type EnforcementMode = "fail-open" | "fail-closed";
 
 type SettingsResponse = {
-  mode: "fail-open" | "fail-closed";
-  enforcement_timeout_seconds: number;
-  block_ttl_seconds: number;
-  rate_limiter: {
-    type: string;
-    language: string;
-    port: number;
-  };
+  mode: EnforcementMode;
 };
+
+type ActiveBlock = {
+  id: string;
+  entity: string;
+  scope: string;
+  decision: "TEMP_BLOCK" | "HARD_BLOCK";
+  risk: number;
+  ttl_seconds: number;
+  active: boolean;
+  source: "auto" | "manual";
+};
+
+/* =========================
+   Helpers
+========================= */
+
+function modeBadge(mode: EnforcementMode) {
+  return mode === "fail-closed"
+    ? { label: "ACTIVE", status: "active" as const }
+    : { label: "MONITOR", status: "medium" as const };
+}
+
+function blockBadge(decision: string) {
+  return decision === "HARD_BLOCK"
+    ? { label: "HARD", status: "blocked" as const }
+    : { label: "TEMP", status: "high" as const };
+}
+
+/* =========================
+   Page
+========================= */
 
 export default function Settings() {
-  const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [mode, setMode] = useState<EnforcementMode | null>(null);
+  const [blocks, setBlocks] = useState<ActiveBlock[]>([]);
   const [enforcerUp, setEnforcerUp] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+
+  /* =========================
+     Fetchers
+  ========================= */
+
+  const fetchMode = async () => {
+    const res = await apiGet<SettingsResponse>("/settings");
+    setMode(res.mode);
+  };
+
+  const fetchBlocks = async () => {
+    const res = await apiGet<ActiveBlock[]>("/blocks/active");
+    setBlocks(res);
+  };
+
+  const checkEnforcer = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 500);
+
+    try {
+      await fetch("http://localhost:8081/health", {
+        signal: controller.signal,
+      });
+      setEnforcerUp(true);
+    } catch {
+      setEnforcerUp(false);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      const data = await apiGet<SettingsResponse>("/settings");
-      setSettings(data);
-    };
-
-    const checkEnforcer = async () => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 500);
-
-  try {
-    await fetch("http://localhost:8081/health", {
-      signal: controller.signal,
-    });
-    setEnforcerUp(true);
-  } catch {
-    setEnforcerUp(false);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
-
-
-    fetchSettings();
-    checkEnforcer();
+    Promise.all([fetchMode(), fetchBlocks(), checkEnforcer()]).finally(() =>
+      setLoading(false)
+    );
 
     const interval = setInterval(() => {
-      fetchSettings();
+      fetchMode();
+      fetchBlocks();
       checkEnforcer();
     }, 5000);
 
     return () => clearInterval(interval);
   }, []);
 
-  if (!settings) {
-    return <div className="text-neutral-400">Loading settings…</div>;
+  /* =========================
+     Actions
+  ========================= */
+
+  const toggleMode = async () => {
+    if (!mode) return;
+
+    const next = mode === "fail-open" ? "fail-closed" : "fail-open";
+    await apiPost("/settings/mode", {
+      mode: next,
+      reason: "Operator toggle",
+    });
+    setMode(next);
+  };
+
+  const unblock = async (blockId: string) => {
+    await apiPost(`/blocks/${blockId}/unblock`, {
+      reason: "Manual override",
+    });
+    fetchBlocks();
+  };
+
+  /* =========================
+     Render
+  ========================= */
+
+  if (loading || !mode) {
+    return <Card title="Enforcement Control">Loading…</Card>;
   }
 
-  const defenseLabel =
-    settings.mode === "fail-closed" ? "ACTIVE" : "MONITOR";
+  const modeStatus = modeBadge(mode);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold">System Settings</h1>
+        <h1 className="text-lg font-semibold">Enforcement Control</h1>
         <p className="text-sm text-neutral-400">
-          Enforcement configuration and runtime status.
+          Live enforcement mode, system health, and active interventions.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Global Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card title="Defense Mode">
-          <span
-            className={`text-2xl font-bold ${
-              defenseLabel === "ACTIVE"
-                ? "text-green-500"
-                : "text-yellow-400"
-            }`}
-          >
-            {defenseLabel}
-          </span>
+          <div className="flex items-center justify-between">
+            <StatusBadge {...modeStatus} />
+            <button
+              onClick={toggleMode}
+              className="text-xs px-3 py-1 rounded bg-neutral-800 hover:bg-neutral-700"
+            >
+              Toggle
+            </button>
+          </div>
         </Card>
 
         <Card title="Enforcer Status">
-          <span
-            className={`text-2xl font-bold ${
-              enforcerUp ? "text-green-500" : "text-red-500"
-            }`}
-          >
-            {enforcerUp ? "UP" : "DOWN"}
-          </span>
+          <StatusBadge
+            label={enforcerUp ? "UP" : "DOWN"}
+            status={enforcerUp ? "active" : "high"}
+          />
         </Card>
 
-        <Card title="Block TTL (seconds)">
-          <span className="text-2xl font-bold">
-            {settings.block_ttl_seconds}
-          </span>
-        </Card>
-
-        <Card title="Enforcement Timeout (seconds)">
-          <span className="text-2xl font-bold">
-            {settings.enforcement_timeout_seconds}
-          </span>
-        </Card>
-
-        <Card title="Rate Limiter Type">
-          <span className="text-lg font-mono">
-            {settings.rate_limiter.type}
-          </span>
-        </Card>
-
-        <Card title="Rate Limiter Runtime">
-          <div className="text-sm space-y-1">
-            <div>Language: {settings.rate_limiter.language}</div>
-            <div>Port: {settings.rate_limiter.port}</div>
-          </div>
+        <Card title="Active Blocks">
+          <span className="text-2xl font-bold">{blocks.length}</span>
         </Card>
       </div>
+
+      {/* Active Enforcement */}
+      <Card title="Active Enforcement">
+        <Table
+          headers={[
+            "Entity",
+            "Scope",
+            "Type",
+            "Risk",
+            "TTL (s)",
+            "Source",
+            "Action",
+          ]}
+        >
+          {blocks.length === 0 ? (
+            <EmptyState message="No active blocks" colSpan={7} />
+          ) : (
+            blocks.map((b) => (
+              <tr key={b.id} className="border-t border-neutral-800">
+                <td className="px-4 py-2">{b.entity}</td>
+                <td className="px-4 py-2">{b.scope}</td>
+                <td className="px-4 py-2">
+                  <StatusBadge {...blockBadge(b.decision)} />
+                </td>
+                <td className="px-4 py-2">{b.risk}</td>
+                <td className="px-4 py-2">{b.ttl_seconds}</td>
+                <td className="px-4 py-2">{b.source}</td>
+                <td className="px-4 py-2">
+                  <button
+                    onClick={() => unblock(b.id)}
+                    className="text-xs px-3 py-1 rounded bg-red-900 text-red-300 hover:bg-red-800"
+                  >
+                    Unblock
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </Table>
+      </Card>
     </div>
   );
 }
