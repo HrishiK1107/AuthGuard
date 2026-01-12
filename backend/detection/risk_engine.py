@@ -1,5 +1,7 @@
 import math
-from typing import Dict
+from typing import Dict, Optional
+
+from backend.config.loader import load_config, ConfigError
 
 
 class RiskEngine:
@@ -9,12 +11,13 @@ class RiskEngine:
     - Entity-aware
     - Exponential decay
     - Deterministic cooling
+    - Config-driven (v2)
     """
 
     def __init__(
         self,
-        half_life_sec: int = 300,
-        max_risk: float = 100.0,
+        half_life_sec: Optional[int] = None,
+        max_risk: Optional[float] = None,
     ):
         """
         half_life_sec:
@@ -23,8 +26,19 @@ class RiskEngine:
         max_risk:
             Upper bound for risk per entity
         """
-        self.half_life_sec = half_life_sec
-        self.max_risk = max_risk
+
+        # Load config safely (no crash on failure)
+        try:
+            config = load_config()
+            cfg_half_life = config.get("risk_engine", "half_life_sec")
+            cfg_max_risk = config.get("risk_engine", "max_risk")
+        except ConfigError:
+            cfg_half_life = None
+            cfg_max_risk = None
+
+        # Preserve existing behavior via fallbacks
+        self.half_life_sec = half_life_sec or cfg_half_life or 300
+        self.max_risk = max_risk or cfg_max_risk or 100.0
 
         # key -> { score, last_updated }
         self.risk_store: Dict[str, Dict[str, float]] = {}
