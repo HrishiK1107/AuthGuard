@@ -8,6 +8,7 @@ import ActiveBlocks from './pages/ActiveBlocks'
 import AttackSimulator from './pages/AttackSimulator'
 import Settings from './pages/Settings'
 import DecisionExplorer from './pages/DecisionExplorer'
+import Campaigns from './pages/Campaigns'
 
 export default function App() {
   return (
@@ -19,9 +20,12 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/logs" element={<Logs />} />
+        <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/rules" element={<DetectionRules />} />
         <Route path="/blocks" element={<ActiveBlocks />} />
         <Route path="/simulator" element={<AttackSimulator />} />
+
+        {/* Phase 6.3 — Enforcement Control (was Settings) */}
         <Route path="/settings" element={<Settings />} />
 
         {/* Phase 6.2 — Decision Explorer */}
