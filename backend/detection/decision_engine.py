@@ -1,5 +1,7 @@
 from enum import Enum
-from typing import Dict
+from typing import Dict, Optional
+
+from backend.config.loader import load_config, ConfigError
 
 
 class Decision(Enum):
@@ -15,19 +17,36 @@ class DecisionEngine:
 
     Maps effective risk score to a decision
     using a policy-defined threshold set.
+    Config-driven (v2).
     """
 
     def __init__(
         self,
-        monitor_threshold: float = 10.0,
-        challenge_threshold: float = 25.0,
-        block_threshold: float = 50.0,
+        monitor_threshold: Optional[float] = None,
+        challenge_threshold: Optional[float] = None,
+        block_threshold: Optional[float] = None,
     ):
+        # Load config safely
+        try:
+            config = load_config()
+            cfg_monitor = config.get("decision_policy", "monitor_threshold")
+            cfg_challenge = config.get("decision_policy", "challenge_threshold")
+            cfg_block = config.get("decision_policy", "block_threshold")
+        except ConfigError:
+            cfg_monitor = None
+            cfg_challenge = None
+            cfg_block = None
+
+        # Preserve existing behavior via fallbacks
+        monitor = monitor_threshold or cfg_monitor or 10.0
+        challenge = challenge_threshold or cfg_challenge or 25.0
+        block = block_threshold or cfg_block or 50.0
+
         # Policy (immutable after init)
         self._policy = {
-            Decision.BLOCK: block_threshold,
-            Decision.CHALLENGE: challenge_threshold,
-            Decision.MONITOR: monitor_threshold,
+            Decision.BLOCK: block,
+            Decision.CHALLENGE: challenge,
+            Decision.MONITOR: monitor,
         }
 
     def decide(self, risk_score: float) -> Dict[str, str]:
