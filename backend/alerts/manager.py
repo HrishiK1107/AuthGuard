@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 
 from backend.alerts.payloads import build_alert
 from backend.alerts.webhook import send_alert
+from backend.config.loader import load_config, ConfigError
 
 
 class AlertManager:
@@ -13,12 +14,24 @@ class AlertManager:
     - Severity-aware
     - Campaign-aware
     - Suppression-window protected
+    - Config-driven (v2)
     """
 
-    def __init__(self, suppression_window_sec: int = 300):
+    def __init__(self, suppression_window_sec: Optional[int] = None):
         # campaign_id -> last_alert_ts
         self._last_alerts: Dict[str, int] = {}
-        self.suppression_window_sec = suppression_window_sec
+
+        # Load config safely
+        try:
+            config = load_config()
+            cfg_window = config.get("alerting", "suppression_window_sec")
+        except ConfigError:
+            cfg_window = None
+
+        # Preserve existing behavior via fallback
+        self.suppression_window_sec = (
+            suppression_window_sec or cfg_window or 300
+        )
 
     def _derive_campaign_id(
         self,
