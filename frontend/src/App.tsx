@@ -9,6 +9,7 @@ import AttackSimulator from './pages/AttackSimulator'
 import Settings from './pages/Settings'
 import DecisionExplorer from './pages/DecisionExplorer'
 import Campaigns from './pages/Campaigns'
+import SystemHealth from './pages/SystemHealth'
 
 export default function App() {
   return (
@@ -25,7 +26,10 @@ export default function App() {
         <Route path="/blocks" element={<ActiveBlocks />} />
         <Route path="/simulator" element={<AttackSimulator />} />
 
-        {/* Phase 6.3 — Enforcement Control (was Settings) */}
+        {/* Phase 6.6 — System Health */}
+        <Route path="/health" element={<SystemHealth />} />
+
+        {/* Phase 6.3 — Enforcement Control */}
         <Route path="/settings" element={<Settings />} />
 
         {/* Phase 6.2 — Decision Explorer */}

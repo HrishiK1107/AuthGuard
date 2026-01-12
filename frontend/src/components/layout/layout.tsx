@@ -8,8 +8,10 @@ const navItems = [
   { name: 'Detection Rules', path: '/rules' },
   { name: 'Active Blocks', path: '/blocks' },
   { name: 'Attack Simulator', path: '/simulator' },
+  { name: 'System Health', path: '/health' },
   { name: 'Enforcement Control', path: '/settings' },
 ]
+
 
 export default function Layout() {
   return (
