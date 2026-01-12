@@ -60,7 +60,7 @@ def dashboard_summary():
 
 
 # =========================================================
-# E5.1 — METRICS ENDPOINT (CORRECT + SAFE)
+# E5.1 — METRICS ENDPOINT (EXISTING, EXTENDED)
 # =========================================================
 @router.get("/metrics")
 def dashboard_metrics():
@@ -156,6 +156,22 @@ def dashboard_metrics():
         risk_distribution[row["bucket"]] = row["cnt"]
 
     # -------------------------
+    # Risk drift (v2)
+    # -------------------------
+    cursor.execute(
+        "SELECT AVG(risk) FROM event_log WHERE ts >= ?",
+        (last_24h_ms,),
+    )
+    avg_risk_24h = cursor.fetchone()[0] or 0.0
+
+    cursor.execute(
+        "SELECT AVG(risk) FROM event_log"
+    )
+    avg_risk_all = cursor.fetchone()[0] or 0.0
+
+    risk_drift = round(avg_risk_all - avg_risk_24h, 2)
+
+    # -------------------------
     # Top risky entities
     # -------------------------
     cursor.execute(
@@ -210,9 +226,53 @@ def dashboard_metrics():
         "mitigation_rate": {
             "blocked_percent": blocked_percent,
         },
+        "risk_drift": {
+            "avg_24h": round(avg_risk_24h, 2),
+            "avg_all_time": round(avg_risk_all, 2),
+            "delta": risk_drift,
+        },
         "timeline": timeline,
         "risk_distribution": risk_distribution,
         "top_entities": top_entities,
         "threat_feed": threat_feed,
         "generated_at": now_ms,
     }
+
+
+# =========================================================
+# E5.2 — HEALTH ENDPOINT (NEW, v2)
+# =========================================================
+@router.get("/health")
+def system_health():
+    """
+    Lightweight health signal.
+    No auth-flow coupling.
+    """
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT MAX(ts) FROM event_log")
+        last_event_ts = cursor.fetchone()[0]
+
+        conn.close()
+
+        now_ms = int(datetime.utcnow().timestamp() * 1000)
+
+        freshness_sec = (
+            (now_ms - last_event_ts) / 1000
+            if last_event_ts else None
+        )
+
+        return {
+            "status": "ok",
+            "db": "reachable",
+            "last_event_age_sec": freshness_sec,
+            "generated_at": now_ms,
+        }
+
+    except Exception as e:
+        return {
+            "status": "degraded",
+            "error": str(e),
+        }
