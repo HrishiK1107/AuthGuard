@@ -27,7 +27,16 @@ def failed_login_velocity(
     if count >= threshold:
         return {
             "triggered": True,
+            "signal_id": "FAILED_LOGIN_VELOCITY",
+            "entity": event.ip_address,
+            "entity_type": "IP",
             "score": 30,
+            "confidence": min(1.0, count / threshold),
+            "decay": {
+                "type": "exponential",
+                "half_life_sec": 300
+            },
+            "tags": ["bruteforce", "velocity"],
             "reason": f"{count} failed logins from IP {key} in short time"
         }
 
@@ -64,7 +73,16 @@ def ip_fan_out(
     if len(unique_users) >= threshold:
         return {
             "triggered": True,
+            "signal_id": "IP_FAN_OUT",
+            "entity": event.ip_address,
+            "entity_type": "IP",
             "score": 40,
+            "confidence": min(1.0, len(unique_users) / threshold),
+            "decay": {
+                "type": "exponential",
+                "half_life_sec": 600
+            },
+            "tags": ["credential_stuffing", "fanout"],
             "reason": f"IP {event.ip_address} attempted {len(unique_users)} users"
         }
 
@@ -101,9 +119,17 @@ def user_fan_in(
     if len(unique_ips) >= threshold:
         return {
             "triggered": True,
+            "signal_id": "USER_FAN_IN",
+            "entity": event.username,
+            "entity_type": "USER",
             "score": 35,
+            "confidence": min(1.0, len(unique_ips) / threshold),
+            "decay": {
+                "type": "exponential",
+                "half_life_sec": 600
+            },
+            "tags": ["account_takeover", "fanin"],
             "reason": f"User {event.username} targeted from {len(unique_ips)} IPs"
         }
 
-    return {"triggered": False
-    }
+    return {"triggered": False}
