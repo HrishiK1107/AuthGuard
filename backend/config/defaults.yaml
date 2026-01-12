@@ -1,0 +1,43 @@
+# AuthGuard v2 — Default System Configuration
+# This file defines immutable system defaults.
+# Runtime overrides must NOT change this file.
+
+authguard:
+  version: v2
+
+detection:
+  windows:
+    ip_failure_window_sec: 300
+    ip_user_window_sec: 600
+    user_ip_window_sec: 600
+
+signals:
+  failed_login_velocity:
+    enabled: true
+    threshold: 5
+    score: 30
+    decay_half_life_sec: 300
+
+  ip_fan_out:
+    enabled: true
+    threshold: 4
+    score: 40
+    decay_half_life_sec: 600
+
+  user_fan_in:
+    enabled: true
+    threshold: 3
+    score: 35
+    decay_half_life_sec: 600
+
+risk_engine:
+  max_risk: 100
+  half_life_sec: 300
+
+decision_policy:
+  monitor_threshold: 10
+  challenge_threshold: 25
+  block_threshold: 50
+
+alerting:
+  suppression_window_sec: 300
