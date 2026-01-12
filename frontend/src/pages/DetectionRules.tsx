@@ -1,121 +1,126 @@
 import { useEffect, useState } from "react";
 import Card from "../components/ui/Card";
-import { apiGet, apiPost } from "../services/api";
+import StatusBadge from "../components/ui/StatusBadge";
+import Table from "../components/ui/Table";
+import EmptyState from "../components/ui/EmptyState";
+import { apiGet } from "../services/api";
 
-type Rule = {
-  enabled: boolean;
+/* =========================
+   Types
+========================= */
+
+type RuleStatus = "quiet" | "active" | "noisy";
+
+type DetectionRule = {
+  name: string;
+  entity: string;
   threshold: number;
+  confidence: number;
+  decay: string;
+  window: string;
+  last_triggered: number | null;
+  trigger_count: number;
+  status: RuleStatus;
+  version: string;
+  loaded: boolean;
 };
 
 type RulesResponse = {
-  rules: Record<string, Rule>;
+  rules: DetectionRule[];
 };
 
+/* =========================
+   Helpers
+========================= */
+
+function statusBadge(status: RuleStatus) {
+  switch (status) {
+    case "active":
+      return { label: "ACTIVE", status: "high" as const };
+    case "noisy":
+      return { label: "NOISY", status: "medium" as const };
+    default:
+      return { label: "QUIET", status: "low" as const };
+  }
+}
+
+/* =========================
+   Page
+========================= */
+
 export default function DetectionRules() {
-  const [rules, setRules] = useState<Record<string, Rule>>({});
+  const [rules, setRules] = useState<DetectionRule[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchRules = async () => {
-    const data = await apiGet<RulesResponse>("/rules");
-    setRules(data.rules);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    fetchRules();
+    apiGet<RulesResponse>("/rules")
+      .then((res) => setRules(res.rules))
+      .finally(() => setLoading(false));
   }, []);
 
-  const toggleRule = async (name: string, enabled: boolean) => {
-    await apiPost(
-      enabled
-        ? `/rules/disable/${name}`
-        : `/rules/enable/${name}`
-    );
-    fetchRules();
-  };
-
-  const updateThreshold = async (name: string, value: number) => {
-    await apiPost(`/rules/threshold/${name}`, {
-      threshold: value,
-    });
-    fetchRules();
-  };
-
   if (loading) {
-    return <div className="text-neutral-400">Loading rules…</div>;
+    return <Card title="Detection Rules">Loading rules…</Card>;
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-lg font-semibold">Detection Rules</h1>
         <p className="text-sm text-neutral-400">
-          Configure detection thresholds and rule states.
+          Read-only visibility into detection signals, confidence, and runtime behavior.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Object.entries(rules).map(([name, rule]) => (
-          <Card key={name} title={name}>
-            <div className="space-y-3">
-              {/* Enabled toggle */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm">
-                  Status:{" "}
-                  <span
-                    className={
-                      rule.enabled
-                        ? "text-green-400"
-                        : "text-red-400"
-                    }
-                  >
-                    {rule.enabled ? "ENABLED" : "DISABLED"}
-                  </span>
-                </span>
-
-                <button
-                  onClick={() => toggleRule(name, rule.enabled)}
-                  className="rounded bg-neutral-800 px-3 py-1 text-xs hover:bg-neutral-700"
-                >
-                  {rule.enabled ? "Disable" : "Enable"}
-                </button>
-              </div>
-
-              {/* Threshold */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-neutral-400">
-                  Threshold
-                </label>
-
-                <input
-                  type="number"
-                  value={rule.threshold}
-                  min={1}
-                  className="w-20 rounded bg-neutral-900 border border-neutral-700 px-2 py-1 text-sm"
-                  onChange={(e) =>
-                    setRules({
-                      ...rules,
-                      [name]: {
-                        ...rule,
-                        threshold: Number(e.target.value),
-                      },
-                    })
-                  }
-                />
-
-                <button
-                  onClick={() =>
-                    updateThreshold(name, rule.threshold)
-                  }
-                  className="rounded bg-blue-600 px-3 py-1 text-xs hover:bg-blue-500"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      {/* Rules Table */}
+      <Card title="Rule Inventory">
+        <Table
+          headers={[
+            "Rule",
+            "Entity",
+            "Threshold",
+            "Confidence",
+            "Decay",
+            "Window",
+            "Triggers",
+            "Last Triggered",
+            "Status",
+            "Version",
+            "Loaded",
+          ]}
+        >
+          {rules.length === 0 ? (
+            <EmptyState message="No rules loaded" colSpan={11} />
+          ) : (
+            rules.map((r) => (
+              <tr key={r.name} className="border-t border-neutral-800">
+                <td className="px-4 py-2 font-mono">{r.name}</td>
+                <td className="px-4 py-2">{r.entity}</td>
+                <td className="px-4 py-2">{r.threshold}</td>
+                <td className="px-4 py-2">{Math.round(r.confidence * 100)}%</td>
+                <td className="px-4 py-2">{r.decay}</td>
+                <td className="px-4 py-2">{r.window}</td>
+                <td className="px-4 py-2">{r.trigger_count}</td>
+                <td className="px-4 py-2">
+                  {r.last_triggered
+                    ? new Date(r.last_triggered * 1000).toLocaleString()
+                    : "—"}
+                </td>
+                <td className="px-4 py-2">
+                  <StatusBadge {...statusBadge(r.status)} />
+                </td>
+                <td className="px-4 py-2 font-mono text-xs">{r.version}</td>
+                <td className="px-4 py-2">
+                  <StatusBadge
+                    label={r.loaded ? "LOADED" : "STALE"}
+                    status={r.loaded ? "active" : "medium"}
+                  />
+                </td>
+              </tr>
+            ))
+          )}
+        </Table>
+      </Card>
     </div>
   );
 }
