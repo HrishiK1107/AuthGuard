@@ -1,4 +1,5 @@
 import requests
+import time
 from typing import Dict, Any, List
 
 from backend.api.settings import RUNTIME_SETTINGS
@@ -23,6 +24,7 @@ class EventProcessor:
     Central orchestration engine.
     Enforcement + Alert aware.
     Campaign-aware (v2).
+    Observability-instrumented (v2.4).
     """
 
     def __init__(self):
@@ -47,6 +49,8 @@ class EventProcessor:
         }
 
     def process(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
+        processing_started_at = time.time()
+
         # 1. Ingest
         event: AuthEvent = ingest_event(raw_event)
         triggered_signals: List[Dict[str, Any]] = []
@@ -109,6 +113,8 @@ class EventProcessor:
         )
         effective_risk = max(ip_risk, user_risk)
 
+        decision_made_at = time.time()
+
         # 4. Base decision
         decision_obj = self.decision_engine.decide(effective_risk)
         base_decision = decision_obj["decision"]
@@ -119,6 +125,7 @@ class EventProcessor:
 
         # 5. Enforcement attempt
         enforcement_available = True
+        enforcement_started_at = time.time()
         try:
             enforcement_response = self._enforce(entity, base_decision)
         except Exception as e:
@@ -127,20 +134,26 @@ class EventProcessor:
                 "allowed": True,
                 "reason": f"enforcement unavailable: {e}"
             }
+        enforcement_completed_at = time.time()
 
         # 6. Mode-aware final decision
         final_decision = base_decision
         if base_decision == "BLOCK" and not enforcement_available:
             final_decision = "CHALLENGE" if mode == "fail-open" else "BLOCK"
 
-        # 7. Enforcement telemetry
+        # 7. Enforcement telemetry (observability added)
         enforcement_telemetry = {
             "decision": final_decision,
             "blocked_at": event.timestamp if final_decision == "BLOCK" else None,
             "ttl_seconds": 300 if final_decision == "BLOCK" else 0,
             "risk_score": effective_risk,
             "campaign": campaign,
-            "signals": triggered_signals
+            "signals": triggered_signals,
+            "latency": {
+                "decision_ms": round((decision_made_at - processing_started_at) * 1000, 2),
+                "enforcement_ms": round((enforcement_completed_at - enforcement_started_at) * 1000, 2),
+                "total_ms": round((enforcement_completed_at - processing_started_at) * 1000, 2),
+            }
         }
 
         # 8. Persist event
