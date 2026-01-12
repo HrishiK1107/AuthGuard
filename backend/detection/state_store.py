@@ -15,7 +15,7 @@ class StateStore:
         self.user_ip_window = SlidingWindow(window_size_ms=60_000)
 
         # Risk engine
-        self.risk_engine = RiskEngine(decay_rate_per_sec=0.5)
+        self.risk_engine = RiskEngine()
 
     def get_ip_failure_window(self) -> SlidingWindow:
         return self.ip_failure_window
