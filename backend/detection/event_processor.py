@@ -22,6 +22,7 @@ class EventProcessor:
     """
     Central orchestration engine.
     Enforcement + Alert aware.
+    Campaign-aware (v2).
     """
 
     def __init__(self):
@@ -29,10 +30,28 @@ class EventProcessor:
         self.decision_engine = DecisionEngine()
         self.alert_manager = AlertManager()
 
+    def _derive_campaign(self, event: AuthEvent) -> Dict[str, str]:
+        """
+        Lightweight campaign derivation.
+        Full campaign engine comes later.
+        """
+        if event.username:
+            return {
+                "campaign_id": f"USER::{event.username}",
+                "campaign_type": "USER"
+            }
+
+        return {
+            "campaign_id": f"IP::{event.ip_address}",
+            "campaign_type": "IP"
+        }
+
     def process(self, raw_event: Dict[str, Any]) -> Dict[str, Any]:
         # 1. Ingest
         event: AuthEvent = ingest_event(raw_event)
         triggered_signals: List[Dict[str, Any]] = []
+
+        campaign = self._derive_campaign(event)
 
         # 2. Signals
         if rules_manager.is_enabled("failed_login_velocity"):
@@ -42,6 +61,7 @@ class EventProcessor:
                 threshold=rules_manager.get_threshold("failed_login_velocity")
             )
             if r.get("triggered"):
+                r["campaign"] = campaign
                 triggered_signals.append(r)
                 self.state_store.get_risk_engine().add_signal(
                     key=event.ip_address,
@@ -56,6 +76,7 @@ class EventProcessor:
                 threshold=rules_manager.get_threshold("ip_fan_out")
             )
             if r.get("triggered"):
+                r["campaign"] = campaign
                 triggered_signals.append(r)
                 self.state_store.get_risk_engine().add_signal(
                     key=event.ip_address,
@@ -70,6 +91,7 @@ class EventProcessor:
                 threshold=rules_manager.get_threshold("user_fan_in")
             )
             if r.get("triggered") and event.username:
+                r["campaign"] = campaign
                 triggered_signals.append(r)
                 self.state_store.get_risk_engine().add_signal(
                     key=event.username,
@@ -117,6 +139,7 @@ class EventProcessor:
             "blocked_at": event.timestamp if final_decision == "BLOCK" else None,
             "ttl_seconds": 300 if final_decision == "BLOCK" else 0,
             "risk_score": effective_risk,
+            "campaign": campaign,
             "signals": triggered_signals
         }
 
@@ -135,7 +158,7 @@ class EventProcessor:
             raw_event=raw_event,
         )
 
-        # 9. ALERTING (D4.2 — single source of truth)
+        # 9. ALERTING
         if final_decision == "BLOCK" or (
             final_decision == "CHALLENGE" and effective_risk >= 50
         ):
@@ -144,15 +167,17 @@ class EventProcessor:
                     event=event,
                     decision=final_decision,
                     risk=effective_risk,
-                    signals=triggered_signals
+                    signals=triggered_signals,
+                    campaign=campaign
                 )
             except Exception:
-                pass  # alerts must NEVER break auth flow
+                pass
 
         # 10. Response
         return {
             "decision": final_decision,
             "risk_score": effective_risk,
+            "campaign": campaign,
             "signals_triggered": triggered_signals,
             "decision_reason": reason,
             "mode": mode,
