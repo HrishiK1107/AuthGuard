@@ -1,13 +1,14 @@
 import sqlite3
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 DB_PATH = Path(__file__).resolve().parent / "authguard.db"
 
 
 def _get_conn():
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS event_log (
@@ -26,6 +27,10 @@ def _get_conn():
     )
     return conn
 
+
+# =========================
+# WRITE PATH (UNCHANGED)
+# =========================
 
 def append_event(
     ts: int,
@@ -58,5 +63,100 @@ def append_event(
             ),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+# =========================
+# READ PATH (v2 ADDITIONS)
+# =========================
+
+def fetch_events_for_entity(
+    entity: str,
+    since_ts: int,
+    until_ts: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Read-only sliding window fetch.
+    Used by Detection Engine v2.
+    """
+    conn = _get_conn()
+    try:
+        query = """
+            SELECT ts, entity, endpoint, outcome, decision, risk, enforcement_allowed,
+                   enforcement_reason, raw_event
+            FROM event_log
+            WHERE entity = ?
+              AND ts >= ?
+        """
+        params = [entity, since_ts]
+
+        if until_ts is not None:
+            query += " AND ts <= ?"
+            params.append(until_ts)
+
+        query += " ORDER BY ts ASC"
+
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+
+        events = []
+        for row in rows:
+            events.append(
+                {
+                    "ts": row["ts"],
+                    "entity": row["entity"],
+                    "endpoint": row["endpoint"],
+                    "outcome": row["outcome"],
+                    "decision": row["decision"],
+                    "risk": row["risk"],
+                    "enforcement": {
+                        "allowed": bool(row["enforcement_allowed"]),
+                        "reason": row["enforcement_reason"],
+                    },
+                    "raw_event": json.loads(row["raw_event"]),
+                }
+            )
+
+        return events
+    finally:
+        conn.close()
+
+
+def event_exists(
+    entity: str,
+    ts: int,
+    raw_event_hash: Optional[str] = None,
+) -> bool:
+    """
+    Replay-safety helper.
+    Can be used by ingestion layer before append_event.
+    """
+    conn = _get_conn()
+    try:
+        if raw_event_hash:
+            row = conn.execute(
+                """
+                SELECT 1 FROM event_log
+                WHERE entity = ? AND ts = ? AND raw_event = ?
+                LIMIT 1
+                """,
+                (entity, ts, raw_event_hash),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                SELECT 1 FROM event_log
+                WHERE entity = ? AND ts = ?
+                LIMIT 1
+                """,
+                (entity, ts),
+            ).fetchone()
+
+        return row is not None
     finally:
         conn.close()
