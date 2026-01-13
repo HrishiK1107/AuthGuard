@@ -68,14 +68,13 @@ def dashboard_summary_alias():
 
 
 # =========================================================
-# E5.1 — METRICS ENDPOINT (EXISTING, EXTENDED)
+# E5.1 — METRICS ENDPOINT (FIXED, DEFENSIVE)
 # =========================================================
 @router.get("/metrics")
 def dashboard_metrics():
     """
     Read-only aggregated metrics.
-    Uses ONLY existing columns.
-    Zero side effects.
+    Defensive against future timestamps.
     """
 
     conn = get_conn()
@@ -91,8 +90,13 @@ def dashboard_metrics():
     total_requests = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COUNT(*) FROM event_log WHERE ts IS NOT NULL AND ts >= ?",
-        (last_24h_ms,),
+        """
+        SELECT COUNT(*) FROM event_log
+        WHERE ts IS NOT NULL
+          AND ts >= ?
+          AND ts <= ?
+        """,
+        (last_24h_ms, now_ms),
     )
     last_24h = cursor.fetchone()[0]
 
@@ -120,11 +124,13 @@ def dashboard_metrics():
             decision,
             COUNT(*) as cnt
         FROM event_log
-        WHERE ts IS NOT NULL AND ts >= ?
+        WHERE ts IS NOT NULL
+          AND ts >= ?
+          AND ts <= ?
         GROUP BY hour, decision
         ORDER BY hour ASC
         """,
-        (last_24h_ms,),
+        (last_24h_ms, now_ms),
     )
 
     timeline_map = {}
@@ -155,8 +161,11 @@ def dashboard_metrics():
             COUNT(*) as cnt
         FROM event_log
         WHERE risk IS NOT NULL
+          AND ts IS NOT NULL
+          AND ts <= ?
         GROUP BY bucket
-        """
+        """,
+        (now_ms,),
     )
 
     risk_distribution = {"low": 0, "medium": 0, "high": 0}
@@ -167,8 +176,13 @@ def dashboard_metrics():
     # Risk drift (v2)
     # -------------------------
     cursor.execute(
-        "SELECT AVG(risk) FROM event_log WHERE ts IS NOT NULL AND ts >= ?",
-        (last_24h_ms,),
+        """
+        SELECT AVG(risk) FROM event_log
+        WHERE ts IS NOT NULL
+          AND ts >= ?
+          AND ts <= ?
+        """,
+        (last_24h_ms, now_ms),
     )
     avg_risk_24h = cursor.fetchone()[0] or 0.0
 
@@ -186,10 +200,13 @@ def dashboard_metrics():
         """
         SELECT entity, MAX(risk) as max_risk
         FROM event_log
+        WHERE ts IS NOT NULL
+          AND ts <= ?
         GROUP BY entity
         ORDER BY max_risk DESC
         LIMIT 5
-        """
+        """,
+        (now_ms,),
     )
 
     top_entities = [
@@ -207,10 +224,13 @@ def dashboard_metrics():
         """
         SELECT entity, decision, risk, endpoint, ts
         FROM event_log
-        WHERE decision = 'BLOCK' AND ts IS NOT NULL
+        WHERE decision = 'BLOCK'
+          AND ts IS NOT NULL
+          AND ts <= ?
         ORDER BY ts DESC
         LIMIT 10
-        """
+        """,
+        (now_ms,),
     )
 
     threat_feed = [
@@ -248,20 +268,24 @@ def dashboard_metrics():
 
 
 # =========================================================
-# E5.2 — HEALTH ENDPOINT (NEW, v2)
+# E5.2 — HEALTH ENDPOINT (FIXED)
 # =========================================================
 @router.get("/health")
 def system_health():
     """
     Lightweight health signal.
-    No auth-flow coupling.
+    Defensive against future timestamps.
     """
     try:
         conn = get_conn()
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT MAX(ts) FROM event_log WHERE ts IS NOT NULL"
+            """
+            SELECT MAX(ts) FROM event_log
+            WHERE ts IS NOT NULL AND ts <= ?
+            """,
+            (int(datetime.utcnow().timestamp() * 1000),),
         )
         last_event_ts = cursor.fetchone()[0]
 

@@ -93,9 +93,6 @@ export default function Logs() {
   const [logs, setLogs] = useState<LogEvent[]>([]);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  /* =========================
-     E4.1 — Filters
-  ========================= */
   const [entityFilter, setEntityFilter] = useState("");
   const [decisionFilter, setDecisionFilter] = useState<"ALL" | string>("ALL");
   const [endpointFilter, setEndpointFilter] = useState<"ALL" | string>("ALL");
@@ -111,9 +108,6 @@ export default function Logs() {
     return () => clearInterval(interval);
   }, []);
 
-  /* =========================
-     Filtered logs
-  ========================= */
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       if (
@@ -132,16 +126,10 @@ export default function Logs() {
     });
   }, [logs, entityFilter, decisionFilter, endpointFilter]);
 
-  /* =========================
-     Endpoint list
-  ========================= */
   const availableEndpoints = useMemo(() => {
     return Array.from(new Set(logs.map((l) => l.endpoint)));
   }, [logs]);
 
-  /* =========================
-     Risk history per entity
-  ========================= */
   const riskHistory = useMemo(() => {
     const map: Record<string, number[]> = {};
 
@@ -157,7 +145,7 @@ export default function Logs() {
   }, [filteredLogs]);
 
   /* =========================
-     Time buckets
+     Time buckets (DEFENSIVE)
   ========================= */
   const bucketLogs = (): Record<BucketKey, LogEvent[]> => {
     const now = Date.now();
@@ -170,7 +158,9 @@ export default function Logs() {
     };
 
     for (const log of filteredLogs) {
-      const ageSec = (now - log.timestamp) / 1000;
+      // Clamp future timestamps
+      const safeTs = Math.min(log.timestamp, now);
+      const ageSec = (now - safeTs) / 1000;
 
       if (ageSec <= 60) buckets.JUST_NOW.push(log);
       else if (ageSec <= 300) buckets.LAST_5_MIN.push(log);
@@ -279,7 +269,6 @@ export default function Logs() {
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">Logs & Events</h1>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3 text-sm">
         <input
           value={entityFilter}

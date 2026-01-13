@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -29,7 +30,32 @@ def _get_conn():
 
 
 # =========================
-# WRITE PATH (UNCHANGED)
+# TIMESTAMP NORMALIZATION (v2 FIX)
+# =========================
+
+def _normalize_ts(ts: int) -> int:
+    """
+    Ensure timestamps are sane.
+
+    - Input assumed to be milliseconds
+    - Future timestamps are clamped to 'now'
+    - Prevents poisoning time-window queries
+    """
+    now_ms = int(time.time() * 1000)
+
+    # If ts is wildly in the future, clamp it
+    if ts > now_ms:
+        return now_ms
+
+    # If ts is zero / negative, also normalize
+    if ts <= 0:
+        return now_ms
+
+    return ts
+
+
+# =========================
+# WRITE PATH (FIXED)
 # =========================
 
 def append_event(
@@ -42,16 +68,20 @@ def append_event(
     enforcement: Dict[str, Any],
     raw_event: Dict[str, Any],
 ):
+    # Normalize timestamp BEFORE writing
+    safe_ts = _normalize_ts(ts)
+
     conn = _get_conn()
     try:
         conn.execute(
             """
             INSERT INTO event_log
-            (ts, entity, endpoint, outcome, decision, risk, enforcement_allowed, enforcement_reason, raw_event)
+            (ts, entity, endpoint, outcome, decision, risk,
+             enforcement_allowed, enforcement_reason, raw_event)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                ts,
+                safe_ts,
                 entity,
                 endpoint,
                 outcome,
@@ -68,7 +98,7 @@ def append_event(
 
 
 # =========================
-# READ PATH (v2 ADDITIONS)
+# READ PATH (UNCHANGED)
 # =========================
 
 def fetch_events_for_entity(
@@ -84,8 +114,8 @@ def fetch_events_for_entity(
     conn = _get_conn()
     try:
         query = """
-            SELECT ts, entity, endpoint, outcome, decision, risk, enforcement_allowed,
-                   enforcement_reason, raw_event
+            SELECT ts, entity, endpoint, outcome, decision, risk,
+                   enforcement_allowed, enforcement_reason, raw_event
             FROM event_log
             WHERE entity = ?
               AND ts >= ?

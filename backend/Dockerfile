@@ -1,32 +1,25 @@
-# =========================
-# AuthGuard Backend Dockerfile
-# Phase 8.3
-# =========================
+# ---------- Build stage ----------
+FROM node:20-alpine AS builder
 
-FROM python:3.11-slim
-
-# Prevent Python from writing pyc files
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set working directory
 WORKDIR /app
 
-# System dependencies (minimal)
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Accept API base at build time
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
-# Copy requirements first (better caching)
-COPY requirements.txt /app/requirements.txt
+COPY package.json package-lock.json ./
+RUN npm ci
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN npm run build
 
-# Copy backend source
-COPY . /app/backend
-# Expose API port
-EXPOSE 8000
+# ---------- Runtime stage ----------
+FROM nginx:alpine
 
-# Start FastAPI with Uvicorn
-CMD ["python", "-m", "uvicorn", "backend.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
