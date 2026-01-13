@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import requests
-
+from backend.api import campaigns
 from backend.detection.event_processor import EventProcessor
 from backend.api.logs import router as logs_router
 from backend.api.rules import router as rules_router
@@ -10,6 +10,7 @@ from backend.api.dashboard import router as dashboard_router
 from backend.api.settings import router as settings_router
 from backend.api.simulator import router as simulator_router
 from backend.storage.block_store import load_blocks
+from backend.api.dashboard import system_health
 
 # ==========================
 # Create FastAPI app FIRST
@@ -83,6 +84,7 @@ app.include_router(blocks_router)
 app.include_router(dashboard_router)
 app.include_router(settings_router)
 app.include_router(simulator_router)
+app.include_router(campaigns.router)
 
 # ==========================
 # Health
@@ -97,3 +99,10 @@ def health_check():
         "service": "authguard",
         "version": "v2"
     }
+
+@app.get("/health/summary")
+def health_summary_root():
+    """
+    Root-level health summary for frontend compatibility.
+    """
+    return system_health()

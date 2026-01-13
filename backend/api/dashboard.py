@@ -310,3 +310,15 @@ def system_health():
             "status": "degraded",
             "error": str(e),
         }
+
+# =========================================================
+# FIX: SUPPORT /health/summary (FRONTEND ALIAS)
+# =========================================================
+@router.get("/health/summary")
+def health_summary_alias():
+    """
+    Alias for frontend compatibility.
+    Maps /health/summary → /dashboard/health
+    """
+    return system_health()
+# =========================================================
