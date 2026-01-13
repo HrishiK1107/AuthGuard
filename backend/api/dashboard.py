@@ -60,6 +60,14 @@ def dashboard_summary():
 
 
 # =========================================================
+# FIX: SUPPORT /dashboard (no trailing slash)
+# =========================================================
+@router.get("")
+def dashboard_summary_alias():
+    return dashboard_summary()
+
+
+# =========================================================
 # E5.1 — METRICS ENDPOINT (EXISTING, EXTENDED)
 # =========================================================
 @router.get("/metrics")
@@ -83,7 +91,7 @@ def dashboard_metrics():
     total_requests = cursor.fetchone()[0]
 
     cursor.execute(
-        "SELECT COUNT(*) FROM event_log WHERE ts >= ?",
+        "SELECT COUNT(*) FROM event_log WHERE ts IS NOT NULL AND ts >= ?",
         (last_24h_ms,),
     )
     last_24h = cursor.fetchone()[0]
@@ -112,7 +120,7 @@ def dashboard_metrics():
             decision,
             COUNT(*) as cnt
         FROM event_log
-        WHERE ts >= ?
+        WHERE ts IS NOT NULL AND ts >= ?
         GROUP BY hour, decision
         ORDER BY hour ASC
         """,
@@ -159,7 +167,7 @@ def dashboard_metrics():
     # Risk drift (v2)
     # -------------------------
     cursor.execute(
-        "SELECT AVG(risk) FROM event_log WHERE ts >= ?",
+        "SELECT AVG(risk) FROM event_log WHERE ts IS NOT NULL AND ts >= ?",
         (last_24h_ms,),
     )
     avg_risk_24h = cursor.fetchone()[0] or 0.0
@@ -199,7 +207,7 @@ def dashboard_metrics():
         """
         SELECT entity, decision, risk, endpoint, ts
         FROM event_log
-        WHERE decision = 'BLOCK'
+        WHERE decision = 'BLOCK' AND ts IS NOT NULL
         ORDER BY ts DESC
         LIMIT 10
         """
@@ -252,7 +260,9 @@ def system_health():
         conn = get_conn()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT MAX(ts) FROM event_log")
+        cursor.execute(
+            "SELECT MAX(ts) FROM event_log WHERE ts IS NOT NULL"
+        )
         last_event_ts = cursor.fetchone()[0]
 
         conn.close()

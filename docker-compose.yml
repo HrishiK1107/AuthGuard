@@ -1,0 +1,26 @@
+services:
+  ratelimiter:
+    image: authguard-ratelimiter
+    container_name: authguard-ratelimiter
+    ports:
+      - "8081:8081"
+
+  backend:
+    image: authguard-backend
+    container_name: authguard-backend
+    ports:
+      - "8000:8000"
+    environment:
+      ENFORCER_URL: http://ratelimiter:8081
+    depends_on:
+      - ratelimiter
+
+  frontend:
+    image: authguard-frontend
+    container_name: authguard-frontend
+    ports:
+      - "5173:80"
+    environment:
+      VITE_API_BASE_URL: http://backend:8000
+    depends_on:
+      - backend

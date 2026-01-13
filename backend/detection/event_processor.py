@@ -15,9 +15,13 @@ from backend.detection.decision_engine import DecisionEngine
 from backend.detection.shared import rules_manager
 from backend.alerts.manager import AlertManager
 from backend.storage.block_store import load_blocks, save_blocks
+import os
 
+GO_ENFORCER_URL = os.getenv(
+    "ENFORCER_URL",
+    "http://localhost:8081"
+) + "/enforce"
 
-GO_ENFORCER_URL = "http://localhost:8081/enforce"
 
 
 class EventProcessor:

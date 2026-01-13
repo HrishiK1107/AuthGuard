@@ -1,6 +1,4 @@
 import * as Recharts from "recharts";
-import React from "react";
-
 /**
  * Local JSX coercion for broken Recharts typings.
  * This does NOT affect runtime behavior.
