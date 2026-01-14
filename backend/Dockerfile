@@ -1,25 +1,22 @@
-# ---------- Build stage ----------
-FROM node:20-alpine AS builder
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Accept API base at build time
-ARG VITE_API_BASE_URL
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+# System deps
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+ && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
-RUN npm ci
+# Install Python deps
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy backend source
 COPY . .
-RUN npm run build
 
-# ---------- Runtime stage ----------
-FROM nginx:alpine
+# Expose FastAPI port
+EXPOSE 8000
 
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# ✅ FIXED ENTRYPOINT (THIS WAS THE BUG)
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]

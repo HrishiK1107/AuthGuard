@@ -1,18 +1,48 @@
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any
+from typing import Dict, Any, List
+from datetime import datetime
 
-from backend.detection.shared import rules_manager   # ✅ SHARED INSTANCE
+from detection.shared import rules_manager# ✅ SHARED INSTANCE
 
 router = APIRouter(prefix="/rules", tags=["rules"])
+
+
+def normalize_rules(raw_rules: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Convert internal rule manager state into frontend-safe rule objects.
+    """
+    normalized = []
+
+    now_ts = int(datetime.utcnow().timestamp())
+
+    for name, rule in raw_rules.items():
+        normalized.append({
+            "name": name,
+            "entity": rule.get("entity", "unknown"),
+            "threshold": rule.get("threshold", 0),
+            "confidence": rule.get("confidence", 0.0),
+            "decay": rule.get("decay", "n/a"),
+            "window": rule.get("window", "n/a"),
+            "last_triggered": rule.get("last_triggered"),
+            "trigger_count": rule.get("trigger_count", 0),
+            "status": rule.get("status", "quiet"),
+            "version": rule.get("version", "v2"),
+            "loaded": rule.get("enabled", False),
+        })
+
+    return normalized
 
 
 @router.get("/")
 def list_rules() -> Dict[str, Any]:
     """
     List all detection rules with their status and thresholds.
+    Frontend-safe normalized response.
     """
+    raw_rules = rules_manager.get_all_rules()
+
     return {
-        "rules": rules_manager.get_all_rules()
+        "rules": normalize_rules(raw_rules)
     }
 
 

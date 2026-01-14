@@ -1,9 +1,10 @@
 import time
 from typing import Dict, Any, Optional
 
-from backend.alerts.payloads import build_alert
-from backend.alerts.webhook import send_alert
-from backend.config.loader import load_config, ConfigError
+from alerts.payloads import build_alert
+from alerts.webhook import send_alert
+from config.loader import load_config, ConfigError
+
 
 
 class AlertManager:

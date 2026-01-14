@@ -14,17 +14,33 @@ def get_conn():
     return conn
 
 
+def table_exists(cursor, table_name: str) -> bool:
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    )
+    return cursor.fetchone() is not None
+
+
 # =========================================================
-# EXISTING DASHBOARD SUMMARY (UNCHANGED)
+# DASHBOARD SUMMARY (CANONICAL)
 # =========================================================
 @router.get("/")
 def dashboard_summary():
     """
-    EXISTING endpoint — unchanged.
-    Used by current dashboard cards.
+    Canonical dashboard summary endpoint.
+    Used by dashboard cards.
     """
     conn = get_conn()
     cursor = conn.cursor()
+
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return {
+            "total_events": 0,
+            "decision_breakdown": {},
+            "top_entities": [],
+        }
 
     cursor.execute("SELECT COUNT(*) FROM event_log")
     total_events = cursor.fetchone()[0]
@@ -60,21 +76,12 @@ def dashboard_summary():
 
 
 # =========================================================
-# FIX: SUPPORT /dashboard (no trailing slash)
-# =========================================================
-@router.get("")
-def dashboard_summary_alias():
-    return dashboard_summary()
-
-
-# =========================================================
-# E5.1 — METRICS ENDPOINT (FIXED, DEFENSIVE)
+# DASHBOARD METRICS
 # =========================================================
 @router.get("/metrics")
 def dashboard_metrics():
     """
-    Read-only aggregated metrics.
-    Defensive against future timestamps.
+    Aggregated metrics for charts and timelines.
     """
 
     conn = get_conn()
@@ -82,6 +89,23 @@ def dashboard_metrics():
 
     now_ms = int(datetime.utcnow().timestamp() * 1000)
     last_24h_ms = now_ms - (24 * 60 * 60 * 1000)
+
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return {
+            "throughput": {"total_requests": 0, "last_24h": 0},
+            "mitigation_rate": {"blocked_percent": 0.0},
+            "risk_drift": {
+                "avg_24h": 0.0,
+                "avg_all_time": 0.0,
+                "delta": 0.0,
+            },
+            "timeline": [],
+            "risk_distribution": {"low": 0, "medium": 0, "high": 0},
+            "top_entities": [],
+            "threat_feed": [],
+            "generated_at": now_ms,
+        }
 
     # -------------------------
     # Throughput
@@ -115,7 +139,7 @@ def dashboard_metrics():
     )
 
     # -------------------------
-    # Timeline (hourly, last 24h)
+    # Timeline
     # -------------------------
     cursor.execute(
         """
@@ -173,7 +197,7 @@ def dashboard_metrics():
         risk_distribution[row["bucket"]] = row["cnt"]
 
     # -------------------------
-    # Risk drift (v2)
+    # Risk drift
     # -------------------------
     cursor.execute(
         """
@@ -186,9 +210,7 @@ def dashboard_metrics():
     )
     avg_risk_24h = cursor.fetchone()[0] or 0.0
 
-    cursor.execute(
-        "SELECT AVG(risk) FROM event_log"
-    )
+    cursor.execute("SELECT AVG(risk) FROM event_log")
     avg_risk_all = cursor.fetchone()[0] or 0.0
 
     risk_drift = round(avg_risk_all - avg_risk_24h, 2)
@@ -210,15 +232,12 @@ def dashboard_metrics():
     )
 
     top_entities = [
-        {
-            "entity": row["entity"],
-            "risk": row["max_risk"],
-        }
+        {"entity": row["entity"], "risk": row["max_risk"]}
         for row in cursor.fetchall()
     ]
 
     # -------------------------
-    # Threat feed (last 10 BLOCKs)
+    # Threat feed
     # -------------------------
     cursor.execute(
         """
@@ -268,17 +287,25 @@ def dashboard_metrics():
 
 
 # =========================================================
-# E5.2 — HEALTH ENDPOINT (FIXED)
+# SYSTEM HEALTH (CANONICAL)
 # =========================================================
 @router.get("/health")
 def system_health():
     """
-    Lightweight health signal.
-    Defensive against future timestamps.
+    Lightweight backend health signal.
     """
     try:
         conn = get_conn()
         cursor = conn.cursor()
+
+        if not table_exists(cursor, "event_log"):
+            conn.close()
+            return {
+                "status": "ok",
+                "db": "reachable",
+                "last_event_age_sec": None,
+                "generated_at": int(datetime.utcnow().timestamp() * 1000),
+            }
 
         cursor.execute(
             """
@@ -310,15 +337,3 @@ def system_health():
             "status": "degraded",
             "error": str(e),
         }
-
-# =========================================================
-# FIX: SUPPORT /health/summary (FRONTEND ALIAS)
-# =========================================================
-@router.get("/health/summary")
-def health_summary_alias():
-    """
-    Alias for frontend compatibility.
-    Maps /health/summary → /dashboard/health
-    """
-    return system_health()
-# =========================================================

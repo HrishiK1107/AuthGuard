@@ -28,9 +28,9 @@ type EffectivenessMetrics = {
 };
 
 type HealthResponse = {
-  mode: "fail-open" | "fail-closed";
-  components: ComponentHealth[];
-  effectiveness: EffectivenessMetrics;
+  mode?: "fail-open" | "fail-closed";
+  components?: ComponentHealth[];
+  effectiveness?: EffectivenessMetrics;
 };
 
 /* =========================
@@ -41,6 +41,22 @@ function healthBadge(status: HealthStatus) {
   return status === "up"
     ? { label: "UP", status: "active" as const }
     : { label: "DOWN", status: "high" as const };
+}
+
+function normalizeHealth(data: HealthResponse) {
+  return {
+    mode: data.mode ?? "fail-open",
+    components: data.components ?? [],
+    effectiveness: {
+      total_events: data.effectiveness?.total_events ?? 0,
+      mitigated_percent: data.effectiveness?.mitigated_percent ?? 0,
+      blocked: data.effectiveness?.blocked ?? 0,
+      challenged: data.effectiveness?.challenged ?? 0,
+      allowed: data.effectiveness?.allowed ?? 0,
+      manual_overrides_24h: data.effectiveness?.manual_overrides_24h ?? 0,
+      avg_latency_ms: data.effectiveness?.avg_latency_ms ?? 0,
+    },
+  };
 }
 
 /* =========================
@@ -54,6 +70,7 @@ export default function SystemHealth() {
   useEffect(() => {
     apiGet<HealthResponse>("/health/summary")
       .then((res) => setData(res))
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, []);
 
@@ -71,6 +88,8 @@ export default function SystemHealth() {
     );
   }
 
+  const health = normalizeHealth(data);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -85,20 +104,20 @@ export default function SystemHealth() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card title="Defense Mode">
           <StatusBadge
-            label={data.mode === "fail-closed" ? "ACTIVE" : "MONITOR"}
-            status={data.mode === "fail-closed" ? "active" : "medium"}
+            label={health.mode === "fail-closed" ? "ACTIVE" : "MONITOR"}
+            status={health.mode === "fail-closed" ? "active" : "medium"}
           />
         </Card>
 
         <Card title="Total Events">
           <span className="text-2xl font-bold">
-            {data.effectiveness.total_events}
+            {health.effectiveness.total_events}
           </span>
         </Card>
 
         <Card title="Mitigation Rate">
           <span className="text-2xl font-bold">
-            {data.effectiveness.mitigated_percent}%
+            {health.effectiveness.mitigated_percent}%
           </span>
         </Card>
       </div>
@@ -106,10 +125,10 @@ export default function SystemHealth() {
       {/* Component Health */}
       <Card title="Component Health">
         <Table headers={["Component", "Status", "Details"]}>
-          {data.components.length === 0 ? (
+          {health.components.length === 0 ? (
             <EmptyState message="No components reported" colSpan={3} />
           ) : (
-            data.components.map((c) => (
+            health.components.map((c) => (
               <tr key={c.name} className="border-t border-neutral-800">
                 <td className="px-4 py-2">{c.name}</td>
                 <td className="px-4 py-2">
@@ -136,14 +155,14 @@ export default function SystemHealth() {
           ]}
         >
           <tr className="border-t border-neutral-800">
-            <td className="px-4 py-2">{data.effectiveness.blocked}</td>
-            <td className="px-4 py-2">{data.effectiveness.challenged}</td>
-            <td className="px-4 py-2">{data.effectiveness.allowed}</td>
+            <td className="px-4 py-2">{health.effectiveness.blocked}</td>
+            <td className="px-4 py-2">{health.effectiveness.challenged}</td>
+            <td className="px-4 py-2">{health.effectiveness.allowed}</td>
             <td className="px-4 py-2">
-              {data.effectiveness.manual_overrides_24h}
+              {health.effectiveness.manual_overrides_24h}
             </td>
             <td className="px-4 py-2">
-              {Math.round(data.effectiveness.avg_latency_ms)}
+              {Math.round(health.effectiveness.avg_latency_ms)}
             </td>
           </tr>
         </Table>

@@ -10,4 +10,6 @@ def list_campaigns():
     Temporary stub for v2.
     Frontend-safe empty response.
     """
-    return []
+    return {
+        "campaigns": []
+    }

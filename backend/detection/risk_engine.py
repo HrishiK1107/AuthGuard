@@ -1,7 +1,7 @@
 import math
 from typing import Dict, Optional
 
-from backend.config.loader import load_config, ConfigError
+from config.loader import load_config, ConfigError
 
 
 class RiskEngine:

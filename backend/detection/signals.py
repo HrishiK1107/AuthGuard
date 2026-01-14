@@ -1,6 +1,7 @@
 from typing import Dict, Any
-from backend.detection.sliding_window import SlidingWindow
-from backend.detection.event_ingest import AuthEvent, Outcome
+
+from detection.sliding_window import SlidingWindow
+from detection.event_ingest import AuthEvent, Outcome
 
 
 # =========================

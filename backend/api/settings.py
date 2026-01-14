@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict
 
-from backend.storage.settings_store import load_settings, save_settings
+from storage.settings_store import load_settings, save_settings
+
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 

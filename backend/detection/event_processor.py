@@ -1,27 +1,29 @@
 import requests
 import time
 from typing import Dict, Any, List
+import os
 
-from backend.api.settings import RUNTIME_SETTINGS
-from backend.storage.event_log import append_event
-from backend.detection.event_ingest import ingest_event, AuthEvent
-from backend.detection.signals import (
+# ==========================
+# FIXED IMPORTS (Docker-safe)
+# ==========================
+from api.settings import RUNTIME_SETTINGS
+from storage.event_log import append_event
+from detection.event_ingest import ingest_event, AuthEvent
+from detection.signals import (
     failed_login_velocity,
     ip_fan_out,
     user_fan_in
 )
-from backend.detection.state_store import StateStore
-from backend.detection.decision_engine import DecisionEngine
-from backend.detection.shared import rules_manager
-from backend.alerts.manager import AlertManager
-from backend.storage.block_store import load_blocks, save_blocks
-import os
+from detection.state_store import StateStore
+from detection.decision_engine import DecisionEngine
+from detection.shared import rules_manager
+from alerts.manager import AlertManager
+from storage.block_store import load_blocks, save_blocks
 
 GO_ENFORCER_URL = os.getenv(
     "ENFORCER_URL",
     "http://localhost:8081"
 ) + "/enforce"
-
 
 
 class EventProcessor:

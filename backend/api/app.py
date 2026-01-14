@@ -1,16 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import requests
-from backend.api import campaigns
-from backend.detection.event_processor import EventProcessor
-from backend.api.logs import router as logs_router
-from backend.api.rules import router as rules_router
-from backend.api.blocks import router as blocks_router
-from backend.api.dashboard import router as dashboard_router
-from backend.api.settings import router as settings_router
-from backend.api.simulator import router as simulator_router
-from backend.storage.block_store import load_blocks
-from backend.api.dashboard import system_health
+import os
+
+# ==========================
+# FIXED IMPORTS (Docker-safe)
+# ==========================
+from api import campaigns
+from api.logs import router as logs_router
+from api.rules import router as rules_router
+from api.blocks import router as blocks_router
+from api.dashboard import router as dashboard_router, system_health
+from api.settings import router as settings_router
+from api.simulator import router as simulator_router
+
+from detection.event_processor import EventProcessor
+from storage.block_store import load_blocks
 
 # ==========================
 # Create FastAPI app FIRST
@@ -31,6 +36,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==========================
+# Enforcer URL (Docker-safe)
+# ==========================
+ENFORCER_URL = os.getenv("ENFORCER_URL", "http://localhost:8081")
 
 # ==========================
 # REPLAY BLOCKS ON STARTUP (v2)
@@ -58,7 +68,7 @@ def replay_blocks():
 
         try:
             requests.post(
-                "http://localhost:8081/enforce",
+                f"{ENFORCER_URL}/enforce",
                 json={
                     "entity": entity,
                     "decision": "BLOCK",
@@ -99,6 +109,7 @@ def health_check():
         "service": "authguard",
         "version": "v2"
     }
+
 
 @app.get("/health/summary")
 def health_summary_root():

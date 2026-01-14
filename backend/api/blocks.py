@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 import requests
 import time
+import os 
 
-from backend.storage.block_store import load_blocks, save_blocks
+from storage.block_store import load_blocks, save_blocks
+
 
 router = APIRouter(prefix="/blocks", tags=["blocks"])
 
@@ -98,3 +100,26 @@ def manual_unblock(payload: Dict[str, Any]):
             status_code=503,
             detail=f"enforcement unavailable: {e}"
         )
+
+
+@router.get("/enforcer/health")
+def enforcer_health():
+    """
+    Backend-authoritative Go enforcer health probe.
+    """
+    try:
+        resp = requests.get(f"{GO_ENFORCER_URL}/health", timeout=1)
+
+        if resp.status_code != 200:
+            raise Exception(f"bad status {resp.status_code}")
+
+        return {
+            "status": "up"
+        }
+
+    except Exception as e:
+        return {
+            "status": "down",
+            "error": str(e)
+        }
+    

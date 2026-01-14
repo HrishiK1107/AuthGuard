@@ -1,8 +1,7 @@
 from enum import Enum
 from typing import Dict, Optional
 
-from backend.config.loader import load_config, ConfigError
-
+from config.loader import load_config, ConfigError
 
 class Decision(Enum):
     ALLOW = "ALLOW"

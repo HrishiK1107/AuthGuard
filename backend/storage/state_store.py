@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
-from backend.storage.event_log import fetch_events_for_entity
-from backend.storage.window import EntityWindowStore
+from storage.event_log import fetch_events_for_entity
+from storage.window import EntityWindowStore
+
 
 
 class StateStore:

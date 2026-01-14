@@ -67,18 +67,13 @@ export default function Settings() {
   };
 
   const checkEnforcer = async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 500);
-
     try {
-      await fetch("http://localhost:8081/health", {
-        signal: controller.signal,
-      });
-      setEnforcerUp(true);
+      const res = await apiGet<{ status: "up" | "down" }>(
+        "/blocks/enforcer/health"
+      );
+      setEnforcerUp(res.status === "up");
     } catch {
       setEnforcerUp(false);
-    } finally {
-      clearTimeout(timeoutId);
     }
   };
 

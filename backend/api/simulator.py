@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import time
 
-from backend.simulator.brute_force import brute_force_attack
-from backend.simulator.credential_stuffing import credential_stuffing_attack
-from backend.simulator.otp_bombing import otp_bombing_attack
+from simulator.brute_force import brute_force_attack
+from simulator.credential_stuffing import credential_stuffing_attack
+from simulator.otp_bombing import otp_bombing_attack
+
 
 router = APIRouter(prefix="/simulate", tags=["simulator"])
 
@@ -40,7 +41,7 @@ def simulate_bruteforce():
             delay=0.2
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {"status": "started", "type": "bruteforce"}
 
@@ -66,7 +67,7 @@ def simulate_credential_stuffing():
             delay=0.3
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {"status": "started", "type": "credential-stuffing"}
 
@@ -94,6 +95,6 @@ def simulate_otp_bombing():
             delay=0.4
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {"status": "started", "type": "otp-bombing"}

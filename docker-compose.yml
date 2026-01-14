@@ -1,17 +1,19 @@
 services:
   ratelimiter:
-    image: authguard-ratelimiter
+    build: ./ratelimiter
     container_name: authguard-ratelimiter
     ports:
       - "8081:8081"
 
   backend:
-    image: authguard-backend
+    build: ./backend
     container_name: authguard-backend
     ports:
       - "8000:8000"
     environment:
       ENFORCER_URL: http://ratelimiter:8081
+    volumes:
+      - ./backend/storage:/app/backend/storage
     depends_on:
       ratelimiter:
         condition: service_started
@@ -21,6 +23,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: http://backend:8000
+    container_name: authguard-frontend
     ports:
       - "5173:80"
     depends_on:

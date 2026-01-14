@@ -4,7 +4,10 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-from backend.detection.event_processor import EventProcessor
+# ==========================
+# FIXED IMPORT (Docker-safe)
+# ==========================
+from detection.event_processor import EventProcessor
 
 router = APIRouter(tags=["logs"])
 
