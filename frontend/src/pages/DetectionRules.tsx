@@ -13,13 +13,13 @@ type RuleStatus = "quiet" | "active" | "noisy";
 
 type DetectionRule = {
   name: string;
-  entity: string;
+  entity?: string;
   threshold: number;
-  confidence: number;
-  decay: string;
-  window: string;
-  last_triggered: number | null;
-  trigger_count: number;
+  confidence?: number;
+  decay?: string;
+  window?: string;
+  last_triggered?: number | null;
+  trigger_count?: number;
   status: RuleStatus;
   version: string;
   loaded: boolean;
@@ -64,7 +64,6 @@ export default function DetectionRules() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-lg font-semibold">Detection Rules</h1>
         <p className="text-sm text-neutral-400">
@@ -72,7 +71,6 @@ export default function DetectionRules() {
         </p>
       </div>
 
-      {/* Rules Table */}
       <Card title="Rule Inventory">
         <Table
           headers={[
@@ -95,12 +93,14 @@ export default function DetectionRules() {
             rules.map((r) => (
               <tr key={r.name} className="border-t border-neutral-800">
                 <td className="px-4 py-2 font-mono">{r.name}</td>
-                <td className="px-4 py-2">{r.entity}</td>
+                <td className="px-4 py-2">{r.entity ?? "unknown"}</td>
                 <td className="px-4 py-2">{r.threshold}</td>
-                <td className="px-4 py-2">{Math.round(r.confidence * 100)}%</td>
-                <td className="px-4 py-2">{r.decay}</td>
-                <td className="px-4 py-2">{r.window}</td>
-                <td className="px-4 py-2">{r.trigger_count}</td>
+                <td className="px-4 py-2">
+                  {Math.round((r.confidence ?? 0) * 100)}%
+                </td>
+                <td className="px-4 py-2">{r.decay ?? "n/a"}</td>
+                <td className="px-4 py-2">{r.window ?? "n/a"}</td>
+                <td className="px-4 py-2">{r.trigger_count ?? 0}</td>
                 <td className="px-4 py-2">
                   {r.last_triggered
                     ? new Date(r.last_triggered * 1000).toLocaleString()

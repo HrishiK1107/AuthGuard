@@ -14,7 +14,7 @@ type HealthStatus = "up" | "down";
 type ComponentHealth = {
   name: string;
   status: HealthStatus;
-  details?: string;
+  details: string;
 };
 
 type EffectivenessMetrics = {
@@ -27,119 +27,147 @@ type EffectivenessMetrics = {
   avg_latency_ms: number;
 };
 
-type HealthResponse = {
-  mode?: "fail-open" | "fail-closed";
-  components?: ComponentHealth[] | Record<string, any>;
-  effectiveness?: EffectivenessMetrics;
-};
-
-/* =========================
-   Helpers
-========================= */
-
-function healthBadge(status: HealthStatus) {
-  return status === "up"
-    ? { label: "UP", status: "active" as const }
-    : { label: "DOWN", status: "high" as const };
-}
-
-function normalizeComponents(
-  raw?: ComponentHealth[] | Record<string, any>
-): ComponentHealth[] {
-  if (!raw) return [];
-
-  // Already correct
-  if (Array.isArray(raw)) return raw;
-
-  // Object → array normalization
-  return Object.entries(raw).map(([name, value]) => ({
-    name,
-    status:
-      value === true || value === "up" || value?.status === "up"
-        ? "up"
-        : "down",
-    details:
-      typeof value === "object" && value?.details
-        ? value.details
-        : undefined,
-  }));
-}
-
-function normalizeHealth(data: HealthResponse) {
-  return {
-    mode: data.mode ?? "fail-open",
-    components: normalizeComponents(data.components),
-    effectiveness: {
-      total_events: data.effectiveness?.total_events ?? 0,
-      mitigated_percent: data.effectiveness?.mitigated_percent ?? 0,
-      blocked: data.effectiveness?.blocked ?? 0,
-      challenged: data.effectiveness?.challenged ?? 0,
-      allowed: data.effectiveness?.allowed ?? 0,
-      manual_overrides_24h: data.effectiveness?.manual_overrides_24h ?? 0,
-      avg_latency_ms: data.effectiveness?.avg_latency_ms ?? 0,
-    },
-  };
-}
-
 /* =========================
    Page
 ========================= */
 
 export default function SystemHealth() {
-  const [data, setData] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [mode, setMode] =
+    useState<"fail-open" | "fail-closed">("fail-open");
+
+  const [components, setComponents] =
+    useState<ComponentHealth[]>([]);
+
+  const [effectiveness, setEffectiveness] =
+    useState<EffectivenessMetrics>({
+      total_events: 0,
+      mitigated_percent: 0,
+      blocked: 0,
+      challenged: 0,
+      allowed: 0,
+      manual_overrides_24h: 0,
+      avg_latency_ms: 0,
+    });
+
   useEffect(() => {
-    apiGet<HealthResponse>("/health/summary")
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+    const fetchHealth = async () => {
+      try {
+        /* =========================
+           Defense Mode
+        ========================= */
+        const settings =
+          await apiGet<{ mode: "fail-open" | "fail-closed" }>("/settings");
+        setMode(settings.mode);
+
+        /* =========================
+           Dashboard Summary
+        ========================= */
+        const dashboard = await apiGet<{
+          total_events: number;
+          decision_breakdown: Record<string, number>;
+        }>("/dashboard/");
+
+        /* =========================
+           Metrics
+        ========================= */
+        const metrics = await apiGet<{
+          mitigation_rate: { blocked_percent: number };
+        }>("/dashboard/metrics");
+
+        setEffectiveness({
+          total_events: dashboard.total_events ?? 0,
+          mitigated_percent:
+            metrics.mitigation_rate?.blocked_percent ?? 0,
+          blocked: dashboard.decision_breakdown?.BLOCK ?? 0,
+          challenged: dashboard.decision_breakdown?.CHALLENGE ?? 0,
+          allowed: dashboard.decision_breakdown?.ALLOW ?? 0,
+          manual_overrides_24h: 0,
+          avg_latency_ms: 0,
+        });
+
+        /* =========================
+           Component Health
+        ========================= */
+        const comps: ComponentHealth[] = [];
+
+        // Backend
+        comps.push({
+          name: "backend",
+          status: "up",
+          details: "API responsive",
+        });
+
+        // Enforcer
+        try {
+          const enforcer =
+            await apiGet<{ status: "up" | "down" }>(
+              "/blocks/enforcer/health"
+            );
+          comps.push({
+            name: "enforcer",
+            status: enforcer.status,
+            details:
+              enforcer.status === "up"
+                ? "Rate limiter reachable"
+                : "Rate limiter unreachable",
+          });
+        } catch {
+          comps.push({
+            name: "enforcer",
+            status: "down",
+            details: "Health check failed",
+          });
+        }
+
+        setComponents(comps);
+      } catch (err) {
+        console.error("System health fetch failed", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
     return <Card title="System Health">Loading system health…</Card>;
   }
 
-  if (!data) {
-    return (
-      <Card title="System Health">
-        <Table headers={["Status"]}>
-          <EmptyState message="Health data unavailable" colSpan={1} />
-        </Table>
-      </Card>
-    );
-  }
-
-  const health = normalizeHealth(data);
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold">System Health & Effectiveness</h1>
+        <h1 className="text-lg font-semibold">
+          System Health & Effectiveness
+        </h1>
         <p className="text-sm text-neutral-400">
           Runtime integrity, enforcement safety, and real-world impact of AuthGuard.
         </p>
       </div>
 
-      {/* System Mode */}
+      {/* Top Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card title="Defense Mode">
           <StatusBadge
-            label={health.mode === "fail-closed" ? "ACTIVE" : "MONITOR"}
-            status={health.mode === "fail-closed" ? "active" : "medium"}
+            label={mode === "fail-closed" ? "ACTIVE" : "MONITOR"}
+            status={mode === "fail-closed" ? "active" : "medium"}
           />
         </Card>
 
         <Card title="Total Events">
           <span className="text-2xl font-bold">
-            {health.effectiveness.total_events}
+            {effectiveness.total_events}
           </span>
         </Card>
 
         <Card title="Mitigation Rate">
           <span className="text-2xl font-bold">
-            {health.effectiveness.mitigated_percent}%
+            {effectiveness.mitigated_percent}%
           </span>
         </Card>
       </div>
@@ -147,17 +175,20 @@ export default function SystemHealth() {
       {/* Component Health */}
       <Card title="Component Health">
         <Table headers={["Component", "Status", "Details"]}>
-          {health.components.length === 0 ? (
+          {components.length === 0 ? (
             <EmptyState message="No component health reported" colSpan={3} />
           ) : (
-            health.components.map((c) => (
+            components.map((c) => (
               <tr key={c.name} className="border-t border-neutral-800">
                 <td className="px-4 py-2">{c.name}</td>
                 <td className="px-4 py-2">
-                  <StatusBadge {...healthBadge(c.status)} />
+                  <StatusBadge
+                    label={c.status.toUpperCase()}
+                    status={c.status === "up" ? "active" : "high"}
+                  />
                 </td>
                 <td className="px-4 py-2 text-sm text-neutral-400">
-                  {c.details ?? "—"}
+                  {c.details}
                 </td>
               </tr>
             ))
@@ -165,7 +196,7 @@ export default function SystemHealth() {
         </Table>
       </Card>
 
-      {/* Effectiveness */}
+      {/* Enforcement Effectiveness */}
       <Card title="Enforcement Effectiveness">
         <Table
           headers={[
@@ -177,14 +208,14 @@ export default function SystemHealth() {
           ]}
         >
           <tr className="border-t border-neutral-800">
-            <td className="px-4 py-2">{health.effectiveness.blocked}</td>
-            <td className="px-4 py-2">{health.effectiveness.challenged}</td>
-            <td className="px-4 py-2">{health.effectiveness.allowed}</td>
+            <td className="px-4 py-2">{effectiveness.blocked}</td>
+            <td className="px-4 py-2">{effectiveness.challenged}</td>
+            <td className="px-4 py-2">{effectiveness.allowed}</td>
             <td className="px-4 py-2">
-              {health.effectiveness.manual_overrides_24h}
+              {effectiveness.manual_overrides_24h}
             </td>
             <td className="px-4 py-2">
-              {Math.round(health.effectiveness.avg_latency_ms)}
+              {effectiveness.avg_latency_ms}
             </td>
           </tr>
         </Table>

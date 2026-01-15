@@ -13,11 +13,11 @@ type CampaignState = "active" | "cooling" | "ended";
 
 type CampaignSummary = {
   id: string;
-  start_time: number;
+  start_time?: number;
   last_seen: number;
-  total_events: number;
+  total_events?: number;
   entities: number;
-  aggregate_risk: number;
+  aggregate_risk?: number;
   state: CampaignState;
   decisions: {
     allow: number;
@@ -42,6 +42,27 @@ function stateBadge(state: CampaignState) {
   }
 }
 
+function deriveEventCount(c: CampaignSummary) {
+  return (
+    c.total_events ??
+    (c.decisions.allow +
+      c.decisions.challenge +
+      c.decisions.block)
+  );
+}
+
+function deriveRisk(c: CampaignSummary) {
+  if (c.aggregate_risk !== undefined) return c.aggregate_risk;
+  if (c.decisions.block > 0) return "HIGH";
+  if (c.decisions.challenge > 0) return "MEDIUM";
+  return "LOW";
+}
+
+function formatTs(ts?: number) {
+  if (!ts) return "—";
+  return new Date(ts * 1000).toLocaleString();
+}
+
 /* =========================
    Page
 ========================= */
@@ -62,7 +83,6 @@ export default function Campaigns() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-lg font-semibold">Attack Campaigns</h1>
         <p className="text-sm text-neutral-400">
@@ -70,7 +90,6 @@ export default function Campaigns() {
         </p>
       </div>
 
-      {/* Campaign Table */}
       <Card title="Campaign Overview">
         <Table
           headers={[
@@ -93,14 +112,16 @@ export default function Campaigns() {
                 <td className="px-4 py-2 font-mono text-xs">{c.id}</td>
                 <td className="px-4 py-2">{c.primary_vector}</td>
                 <td className="px-4 py-2">
-                  {new Date(c.start_time * 1000).toLocaleString()}
+                  {formatTs(c.start_time ?? c.last_seen)}
                 </td>
                 <td className="px-4 py-2">
-                  {new Date(c.last_seen * 1000).toLocaleString()}
+                  {formatTs(c.last_seen)}
                 </td>
-                <td className="px-4 py-2">{c.total_events}</td>
+                <td className="px-4 py-2">
+                  {deriveEventCount(c)}
+                </td>
                 <td className="px-4 py-2">{c.entities}</td>
-                <td className="px-4 py-2">{c.aggregate_risk}</td>
+                <td className="px-4 py-2">{deriveRisk(c)}</td>
                 <td className="px-4 py-2 text-xs">
                   A:{c.decisions.allow} ·
                   C:{c.decisions.challenge} ·

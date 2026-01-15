@@ -17,7 +17,7 @@
     "decision": "HARD_BLOCK",
     "risk": null,
     "ttl_seconds": 300,
-    "active": true,
+    "active": false,
     "source": "manual",
     "created_at": 1768465225910
   },
