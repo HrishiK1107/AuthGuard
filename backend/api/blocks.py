@@ -1,25 +1,21 @@
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any
+from typing import Dict, Any, List
 import requests
 import time
-import os 
+import os
 
 from storage.block_store import load_blocks, save_blocks
 
-
 router = APIRouter(prefix="/blocks", tags=["blocks"])
 
-GO_ENFORCER_URL = "http://localhost:8081"
+GO_ENFORCER_URL = os.getenv("ENFORCER_URL", "http://ratelimiter:8081")
 
-# Python-side authoritative mirror
-ACTIVE_BLOCKS: Dict[str, Dict[str, Any]] = load_blocks()
+# Canonical storage: LIST of block objects
+ACTIVE_BLOCKS: List[Dict[str, Any]] = load_blocks()
 
 
 @router.get("/")
 def list_blocks():
-    """
-    List currently blocked entities with telemetry.
-    """
     return {
         "count": len(ACTIVE_BLOCKS),
         "blocks": ACTIVE_BLOCKS
@@ -33,14 +29,15 @@ def manual_block(payload: Dict[str, Any]):
 
     entity = payload["entity"]
     ttl = int(payload.get("ttl_seconds", 300))
+    now = int(time.time() * 1000)
 
-    telemetry = {
-        "blocked_at": int(time.time() * 1000),
-        "ttl_seconds": ttl,
-        "risk_score": payload.get("risk_score"),
-        "signals": payload.get("signals", []),
-        "reason": payload.get("reason", "manual")
-    }
+    # Prevent duplicate active blocks
+    for b in ACTIVE_BLOCKS:
+        if b.get("entity") == entity and b.get("active", True):
+            return {
+                "status": "already_blocked",
+                "entity": entity
+            }
 
     try:
         requests.post(
@@ -52,21 +49,32 @@ def manual_block(payload: Dict[str, Any]):
             },
             timeout=1
         )
-
-        ACTIVE_BLOCKS[entity] = telemetry
-        save_blocks(ACTIVE_BLOCKS)
-
-        return {
-            "status": "blocked",
-            "entity": entity,
-            "telemetry": telemetry
-        }
-
     except Exception as e:
         raise HTTPException(
             status_code=503,
             detail=f"enforcement unavailable: {e}"
         )
+
+    block = {
+        "id": f"manual::{entity}",
+        "entity": entity,
+        "scope": "auth",
+        "decision": "HARD_BLOCK",
+        "risk": payload.get("risk_score"),
+        "ttl_seconds": ttl,
+        "active": True,
+        "source": "manual",
+        "created_at": now
+    }
+
+    ACTIVE_BLOCKS.append(block)
+    save_blocks(ACTIVE_BLOCKS)
+
+    return {
+        "status": "blocked",
+        "entity": entity,
+        "block": block
+    }
 
 
 @router.post("/unblock")
@@ -86,40 +94,36 @@ def manual_unblock(payload: Dict[str, Any]):
             },
             timeout=1
         )
-
-        ACTIVE_BLOCKS.pop(entity, None)
-        save_blocks(ACTIVE_BLOCKS)
-
-        return {
-            "status": "unblocked",
-            "entity": entity
-        }
-
     except Exception as e:
         raise HTTPException(
             status_code=503,
             detail=f"enforcement unavailable: {e}"
         )
 
+    changed = False
+    for b in ACTIVE_BLOCKS:
+        if b.get("entity") == entity and b.get("active", True):
+            b["active"] = False
+            changed = True
+
+    if changed:
+        save_blocks(ACTIVE_BLOCKS)
+
+    return {
+        "status": "unblocked",
+        "entity": entity
+    }
+
 
 @router.get("/enforcer/health")
 def enforcer_health():
-    """
-    Backend-authoritative Go enforcer health probe.
-    """
     try:
         resp = requests.get(f"{GO_ENFORCER_URL}/health", timeout=1)
-
         if resp.status_code != 200:
             raise Exception(f"bad status {resp.status_code}")
-
-        return {
-            "status": "up"
-        }
-
+        return {"status": "up"}
     except Exception as e:
         return {
             "status": "down",
             "error": str(e)
         }
-    

@@ -9,5 +9,27 @@
     "active": true,
     "source": "auto",
     "created_at": 1700003001000
+  },
+  {
+    "id": "manual::10.0.0.69",
+    "entity": "10.0.0.69",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": null,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "manual",
+    "created_at": 1768465225910
+  },
+  {
+    "id": "manual::10.0.0.203",
+    "entity": "10.0.0.203",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": null,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "manual",
+    "created_at": 1768465268888
   }
 ]
