@@ -46,6 +46,10 @@ type MetricsResponse = {
   };
 };
 
+type Block = {
+  active: boolean;
+};
+
 /* =========================
    Dashboard
 ========================= */
@@ -71,6 +75,8 @@ export default function Dashboard() {
     high: 0,
   });
 
+  const [activeBlocksCount, setActiveBlocksCount] = useState(0);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -93,6 +99,14 @@ export default function Dashboard() {
         setThreats(metrics.threat_feed);
         setTimeline(metrics.timeline);
         setRiskDistribution(metrics.risk_distribution);
+
+        // NEW: Active Blocks (live enforcement)
+        const blocksRes =
+          await apiGet<{ blocks: Block[] }>("/blocks/");
+        const activeCount = blocksRes.blocks.filter(
+          (b) => b.active
+        ).length;
+        setActiveBlocksCount(activeCount);
       } catch (err) {
         console.error("Dashboard fetch failed", err);
       }
@@ -115,7 +129,7 @@ export default function Dashboard() {
       {/* =========================
          Top Stats
       ========================= */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card title="Total Events">
           <span className="text-2xl font-bold">
             {summary.total_events}
@@ -125,6 +139,12 @@ export default function Dashboard() {
         <Card title="Blocked Events">
           <span className="text-2xl font-bold text-red-500">
             {summary.decision_breakdown["BLOCK"] ?? 0}
+          </span>
+        </Card>
+
+        <Card title="Active Blocks">
+          <span className="text-2xl font-bold text-red-400">
+            {activeBlocksCount}
           </span>
         </Card>
 
@@ -291,8 +311,8 @@ export default function Dashboard() {
         </Table>
       </div>
 
-     {/* =========================
-         Top Active Entities (FIXED)
+      {/* =========================
+         Top Active Entities
       ========================= */}
       <div>
         <h2 className="text-sm font-medium text-neutral-300 mb-2">
@@ -318,8 +338,6 @@ export default function Dashboard() {
                 <td className="px-4 py-2 font-mono">
                   {item.entity}
                 </td>
-
-                {/* FIX: padding buffer so numbers don’t kiss the wall */}
                 <td className="px-4 py-2">
                   <div className="text-right font-mono pr-6">
                     {item.count}

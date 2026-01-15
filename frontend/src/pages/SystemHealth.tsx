@@ -29,7 +29,7 @@ type EffectivenessMetrics = {
 
 type HealthResponse = {
   mode?: "fail-open" | "fail-closed";
-  components?: ComponentHealth[];
+  components?: ComponentHealth[] | Record<string, any>;
   effectiveness?: EffectivenessMetrics;
 };
 
@@ -43,10 +43,32 @@ function healthBadge(status: HealthStatus) {
     : { label: "DOWN", status: "high" as const };
 }
 
+function normalizeComponents(
+  raw?: ComponentHealth[] | Record<string, any>
+): ComponentHealth[] {
+  if (!raw) return [];
+
+  // Already correct
+  if (Array.isArray(raw)) return raw;
+
+  // Object → array normalization
+  return Object.entries(raw).map(([name, value]) => ({
+    name,
+    status:
+      value === true || value === "up" || value?.status === "up"
+        ? "up"
+        : "down",
+    details:
+      typeof value === "object" && value?.details
+        ? value.details
+        : undefined,
+  }));
+}
+
 function normalizeHealth(data: HealthResponse) {
   return {
     mode: data.mode ?? "fail-open",
-    components: data.components ?? [],
+    components: normalizeComponents(data.components),
     effectiveness: {
       total_events: data.effectiveness?.total_events ?? 0,
       mitigated_percent: data.effectiveness?.mitigated_percent ?? 0,
@@ -69,7 +91,7 @@ export default function SystemHealth() {
 
   useEffect(() => {
     apiGet<HealthResponse>("/health/summary")
-      .then((res) => setData(res))
+      .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, []);
@@ -126,7 +148,7 @@ export default function SystemHealth() {
       <Card title="Component Health">
         <Table headers={["Component", "Status", "Details"]}>
           {health.components.length === 0 ? (
-            <EmptyState message="No components reported" colSpan={3} />
+            <EmptyState message="No component health reported" colSpan={3} />
           ) : (
             health.components.map((c) => (
               <tr key={c.name} className="border-t border-neutral-800">

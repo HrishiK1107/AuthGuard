@@ -20,7 +20,7 @@ type ActiveBlock = {
   entity: string;
   scope: string;
   decision: "TEMP_BLOCK" | "HARD_BLOCK";
-  risk: number;
+  risk: number | null;
   ttl_seconds: number;
   active: boolean;
   source: "auto" | "manual";
@@ -62,15 +62,13 @@ export default function Settings() {
   };
 
   const fetchBlocks = async () => {
-    const res = await apiGet<ActiveBlock[]>("/blocks/active");
-    setBlocks(res);
+    const res = await apiGet<{ count: number; blocks: ActiveBlock[] }>("/blocks/");
+    setBlocks(res.blocks || []);
   };
 
   const checkEnforcer = async () => {
     try {
-      const res = await apiGet<{ status: "up" | "down" }>(
-        "/blocks/enforcer/health"
-      );
+      const res = await apiGet<{ status: "up" | "down" }>("/blocks/enforcer/health");
       setEnforcerUp(res.status === "up");
     } catch {
       setEnforcerUp(false);
@@ -106,12 +104,19 @@ export default function Settings() {
     setMode(next);
   };
 
-  const unblock = async (blockId: string) => {
-    await apiPost(`/blocks/${blockId}/unblock`, {
+  const unblock = async (entity: string) => {
+    await apiPost("/blocks/unblock", {
+      entity,
       reason: "Manual override",
     });
     fetchBlocks();
   };
+
+  /* =========================
+     Derived State
+  ========================= */
+
+  const activeBlocks = blocks.filter((b) => b.active);
 
   /* =========================
      Render
@@ -155,7 +160,7 @@ export default function Settings() {
         </Card>
 
         <Card title="Active Blocks">
-          <span className="text-2xl font-bold">{blocks.length}</span>
+          <span className="text-2xl font-bold">{activeBlocks.length}</span>
         </Card>
       </div>
 
@@ -172,22 +177,25 @@ export default function Settings() {
             "Action",
           ]}
         >
-          {blocks.length === 0 ? (
-            <EmptyState message="No active blocks" colSpan={7} />
+          {activeBlocks.length === 0 ? (
+            <EmptyState
+              message="No active blocks. Enforcement is armed and monitoring."
+              colSpan={7}
+            />
           ) : (
-            blocks.map((b) => (
+            activeBlocks.map((b) => (
               <tr key={b.id} className="border-t border-neutral-800">
                 <td className="px-4 py-2">{b.entity}</td>
                 <td className="px-4 py-2">{b.scope}</td>
                 <td className="px-4 py-2">
                   <StatusBadge {...blockBadge(b.decision)} />
                 </td>
-                <td className="px-4 py-2">{b.risk}</td>
+                <td className="px-4 py-2">{b.risk ?? "—"}</td>
                 <td className="px-4 py-2">{b.ttl_seconds}</td>
                 <td className="px-4 py-2">{b.source}</td>
                 <td className="px-4 py-2">
                   <button
-                    onClick={() => unblock(b.id)}
+                    onClick={() => unblock(b.entity)}
                     className="text-xs px-3 py-1 rounded bg-red-900 text-red-300 hover:bg-red-800"
                   >
                     Unblock
