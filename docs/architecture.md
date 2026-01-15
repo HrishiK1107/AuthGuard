@@ -1,35 +1,37 @@
-Good.
-Below is a **complete, production-grade `architecture.md`** for **AuthGuard**, written to match **your exact system**, codebase, and decisions.
-No filler. No assumptions. No marketing fluff.
-
-You can drop this directly into `docs/architecture.md`.
-
----
-
 # AuthGuard — System Architecture
 
 ## 1. Overview
 
-AuthGuard is a **behavior-based authentication abuse detection and enforcement system** designed to identify, score, and mitigate malicious authentication activity in real time.
+AuthGuard is a **behavior-based authentication abuse detection and enforcement system**
+designed to identify, score, correlate, and mitigate malicious authentication activity
+in real time.
 
-Unlike traditional rate-limiting systems that rely on static thresholds, AuthGuard uses **event-driven behavioral signals**, **sliding windows**, and a **decaying risk engine** to make adaptive decisions such as:
+Unlike traditional rate-limiting systems that rely on static counters, AuthGuard uses:
 
-* `ALLOW`
-* `CHALLENGE`
-* `BLOCK`
+- **Event-driven behavioral signals**
+- **Sliding time windows**
+- **Time-decayed risk modeling**
+- **Campaign-level correlation**
 
-The system is built to be:
+to produce **deterministic, explainable decisions**:
 
-* **Stateful**
-* **Explainable**
-* **Fail-safe**
-* **Restart-resilient**
+- `ALLOW`
+- `CHALLENGE`
+- `BLOCK`
+
+The system is intentionally designed to be:
+
+- **Stateful**
+- **Explainable**
+- **Restart-resilient**
+- **Operationally safe**
+
+AuthGuard is a security control, not an authentication provider.
 
 ---
 
 ## 2. High-Level Architecture
 
-```
 Client / Simulator
         |
         v
@@ -47,14 +49,20 @@ Client / Simulator
         v
 +------------------------+
 | Detection Engine       |
-| - Signals              |
+| - Behavioral Signals   |
 | - Sliding Windows      |
 +------------------------+
         |
         v
 +------------------------+
+| Campaign Correlation   |
+| - Multi-event linking  |
++------------------------+
+        |
+        v
++------------------------+
 | Risk Engine            |
-| - Decay                |
+| - Time decay           |
 | - Aggregation          |
 +------------------------+
         |
@@ -70,7 +78,7 @@ Client / Simulator
         v                    v
 +----------------+    +-------------------+
 | Go Enforcer    |    | Alerting Engine   |
-| (rate control) |    | (webhook/Slack)   |
+| (TTL control)  |    | (Webhooks)        |
 +----------------+    +-------------------+
         |
         v
@@ -78,69 +86,59 @@ Client / Simulator
 | Persistent Storage     |
 | (SQLite event_log)     |
 +------------------------+
-```
 
 ---
 
 ## 3. Core Components
 
-### 3.1 FastAPI Ingest Layer (Python)
+### 3.1 FastAPI Ingest Layer
 
 **Purpose**
-
-* Accept authentication events from simulators or real systems
-* Normalize attacker-controlled input
-* Guarantee internal consistency
+- Accept authentication events from simulators or real systems
+- Validate and normalize attacker-controlled input
+- Provide a stateless ingress boundary
 
 **Key properties**
+- Stateless request handling
+- Strict canonical schema (`AuthEvent`)
+- Defensive parsing (timestamps, IPs, usernames)
 
-* Stateless at the API level
-* Strict canonical schema (`AuthEvent`)
-* Defensive parsing (timestamps, IPs, usernames)
-
-**Why FastAPI**
-
-* Async-friendly
-* Typed models
-* Clean router separation
-* Easy observability
+**Design rule**
+> Detection logic never operates on raw input.
 
 ---
 
 ### 3.2 Event Normalization
 
-AuthGuard separates **raw input** from **internal truth**.
+Raw authentication events are **untrusted input**.
 
-* Raw events are attacker-controlled
-* Canonical events are strictly validated
+Normalization enforces:
+- Required fields
+- Safe timestamps
+- Consistent entity identifiers
 
 This prevents:
+- Timestamp poisoning
+- Schema drift
+- Detection bypass via malformed events
 
-* Timestamp poisoning
-* Missing field crashes
-* Schema drift
-
-**Design decision**
-
-> Never let detection logic operate on raw input.
+Canonical events are the **only source of truth** downstream.
 
 ---
 
 ### 3.3 Detection Engine (Signals)
 
-Signals represent **behavioral patterns**, not single failures.
+Signals model **behavior over time**, not individual failures.
 
-Current signals include:
-
-* Failed login velocity
-* IP fan-out (many users from one IP)
-* User fan-in (many IPs targeting one user)
+Implemented signals include:
+- Failed login velocity
+- IP fan-out (many users from one IP)
+- User fan-in (many IPs targeting one user)
 
 Each signal:
-
-* Uses a **sliding time window**
-* Produces a **risk score**
-* Is independently configurable
+- Operates on a **sliding time window**
+- Emits a bounded score
+- Is independently configurable
 
 Signals are **orthogonal** and composable.
 
@@ -148,221 +146,211 @@ Signals are **orthogonal** and composable.
 
 ### 3.4 Sliding Window State Store
 
-AuthGuard maintains in-memory state using:
-
-* Deques
-* Hash maps
-* Time-based eviction
+AuthGuard maintains in-memory temporal state using:
+- Deques
+- Hash maps
+- Timestamp-based eviction
 
 **Why sliding windows**
+- Fixed counters are easy to evade
+- Windows preserve temporal structure
+- Burst behavior becomes observable
 
-* Fixed-rate counters are easy to evade
-* Windows preserve temporal behavior
-* Enable burst detection
-
-Eviction is timestamp-driven, not request-count-driven.
-
----
-
-### 3.5 Risk Engine
-
-Risk is not binary.
-
-AuthGuard aggregates signals into a **continuous risk score** per entity.
-
-Key properties:
-
-* Scores **decay over time**
-* Multiple signals stack
-* Entity-scoped (IP or username)
-
-This enables:
-
-* Cool-down behavior after attacks stop
-* Persistent attackers to stay blocked
-* Natural recovery for benign users
+Eviction is **time-driven**, not request-driven.
 
 ---
 
-### 3.6 Decision Engine
+### 3.5 Campaign Correlation Layer
 
-Risk scores are mapped to actions:
+AuthGuard introduces **campaign-level correlation**.
 
-| Risk Range | Decision  |
-| ---------- | --------- |
+A campaign represents:
+- Sustained or coordinated malicious behavior
+- Across time
+- Across entities (IP, user, endpoint)
+
+Campaigns track:
+- First and last seen timestamps
+- Decision distribution
+- Affected entities
+- Primary attack vector
+- Campaign state (active / cooling / ended)
+
+Campaigns provide **context**, not enforcement.
+
+---
+
+### 3.6 Risk Engine
+
+Risk is modeled as a **continuous, decaying value**.
+
+Properties:
+- Risk increases with suspicious behavior
+- Risk decays when traffic stops
+- Sustained attacks overpower decay
+- Normal users recover naturally
+
+Risk is scoped per entity (IP or user),
+and the **maximum effective risk** drives decisions.
+
+---
+
+### 3.7 Decision Engine (Pure Logic)
+
+The decision engine maps risk to actions:
+
+| Risk Level | Decision  |
+|------------|-----------|
 | Low        | ALLOW     |
 | Medium     | CHALLENGE |
 | High       | BLOCK     |
 
-The decision engine is **pure logic**:
+Key properties:
+- No I/O
+- No persistence
+- No side effects
+- Fully deterministic
 
-* No I/O
-* No side effects
-* Fully testable
+This separation guarantees auditability and testability.
 
 ---
 
-### 3.7 Enforcement Layer (Go)
+### 3.8 Enforcement Layer (Go)
 
-AuthGuard separates **detection** from **enforcement**.
+AuthGuard **does not enforce blocks directly**.
 
-* Detection runs in Python
-* Enforcement runs in Go
-
-**Why Go**
-
-* Concurrency-safe
-* Low latency
-* Production-style service
-* Clear separation of concerns
+Enforcement is delegated to a separate Go service to ensure:
+- Isolation from detection failures
+- Concurrency safety
+- Production-style enforcement semantics
 
 The enforcer:
+- Applies TTL-based blocks
+- Persists active blocks
+- Replays blocks on restart
 
-* Receives decisions
-* Applies TTL-based blocks
-* Is restart-resilient
-
----
-
-### 3.8 Fail-Open / Fail-Closed Modes
-
-AuthGuard supports runtime defense modes:
-
-* **Fail-open**: enforcement failure downgrades BLOCK → CHALLENGE
-* **Fail-closed**: BLOCK remains BLOCK even if enforcement fails
-
-This is configurable via `/settings`.
-
-**Reason**
-
-> Security posture must be adjustable without redeploys.
+Detection and enforcement are **intentionally decoupled**.
 
 ---
 
-### 3.9 Alerting Engine
+### 3.9 Fail-Open / Fail-Closed Modes
 
-Alerts are emitted when:
+Runtime defense modes:
+- **Fail-open**: enforcement failure downgrades BLOCK → CHALLENGE
+- **Fail-closed**: enforcement continues even if degraded
 
-* An entity is BLOCKed
-* Sustained CHALLENGE activity occurs
+Modes are configurable at runtime via `/settings`.
 
-Properties:
-
-* Non-blocking
-* Best-effort delivery
-* Webhook-based
-* Cannot break auth flow
-
-Alerting is **observability**, not enforcement.
+This allows posture changes without redeployments.
 
 ---
 
-### 3.10 Persistence Layer
+### 3.10 Alerting Engine
 
-AuthGuard persists **everything** relevant to decisions:
+Alerts are generated when:
+- An entity is BLOCKed
+- Suspicious behavior persists
 
-Stored fields include:
+Alerting is:
+- Non-blocking
+- Best-effort
+- Webhook-based
 
-* Timestamp
-* Entity
-* Endpoint
-* Outcome
-* Decision
-* Risk
-* Enforcement metadata
-* Raw event snapshot
-
-This enables:
-
-* Post-incident analysis
-* Dashboards
-* Replayability
-* Metrics computation
-
-SQLite is used intentionally:
-
-* Deterministic
-* Zero external dependency
-* Easy to replace later
+Alert delivery failures never impact authentication flow.
 
 ---
 
-## 4. Dashboard Architecture
+### 3.11 Persistence Layer
 
-The dashboard is **read-only** by design.
+AuthGuard persists all security-relevant events:
 
-* `/dashboard` → summary stats
-* `/dashboard/metrics` → aggregated analytics
-* `/logs` → raw event timeline
+Stored data includes:
+- Timestamp
+- Entity
+- Endpoint
+- Outcome
+- Decision
+- Risk
+- Enforcement metadata
+- Raw event snapshot
 
-Key rules:
+Persistence enables:
+- Dashboards
+- Metrics
+- Forensics
+- Replayability
 
-* No mutations
-* No side effects
-* Safe math only
-* Missing columns handled gracefully
+SQLite is used intentionally for determinism and simplicity.
 
-Frontend polls periodically; backend remains stateless.
+---
+
+## 4. Operator Dashboards
+
+Dashboards are **read-only by design**.
+
+They are composed from real backend sources:
+- `/dashboard` — summary stats
+- `/dashboard/metrics` — aggregations
+- `/logs` — raw events
+- `/blocks` — active enforcement
+
+Derived metrics are explicit and never fabricated.
 
 ---
 
 ## 5. Restart & Recovery Guarantees
 
 On backend startup:
+- Persisted blocks are replayed into the enforcer
+- Campaign and risk state resumes
+- No enforcement gaps are introduced
 
-* Existing blocks are replayed into the Go enforcer
-* No attacker bypass via restart
-* System resumes previous security posture
-
-This is critical for real deployments.
+Restart safety is a core design requirement.
 
 ---
 
-## 6. Non-Goals (Intentional)
+## 6. Deployment Architecture 
+
+AuthGuard runs as a **three-service stack**:
+
+- FastAPI backend (detection, risk, decision)
+- Go enforcer (TTL enforcement)
+- Frontend (operator dashboards)
+
+All services are containerized and orchestrated via Docker Compose.
+
+---
+
+## 7. Non-Goals (Intentional)
 
 AuthGuard does **not**:
+- Perform authentication
+- Store credentials
+- Replace IAM systems
+- Act as an identity provider
 
-* Replace IAM systems
-* Perform credential validation
-* Store secrets
-* Act as an authentication provider
-
-It is a **security control**, not an auth service.
-
----
-
-## 7. Design Philosophy
-
-* Behavior > counters
-* Explainability > black boxes
-* Separation of concerns
-* Safe failure modes
-* Minimal magic
+It is a **defensive security control**.
 
 ---
 
-## 8. Future Extensions (Planned)
+## 8. Design Philosophy
 
-* Distributed state backend (Redis)
-* Prometheus metrics export
-* Authenticated dashboard
-* Multi-tenant support
-* Policy-driven rule DSL
+- Behavior > counters
+- Explainability > black boxes
+- Separation of concerns
+- Safe failure modes
+- Minimal magic
 
 ---
 
 ## 9. Summary
 
-AuthGuard is designed as a **real security system**, not a demo:
+AuthGuard reflects how **real security systems are built**:
 
-* Adaptive
-* Stateful
-* Observable
-* Restart-safe
-* Production-minded
+- Adaptive
+- Stateful
+- Observable
+- Restart-safe
+- Operationally coherent
 
-This architecture intentionally mirrors how modern security controls are built in real environments.
-
----
-
-
+This architecture is designed to be extended without violating its core guarantees.

@@ -1,95 +1,78 @@
-Here is a **complete, production-grade `tradeoffs.md`** tailored exactly to **AuthGuard as it exists today**.
-Drop this directly into `docs/tradeoffs.md`.
+# AuthGuard — Design Tradeoffs (v2)
 
----
-
-# AuthGuard — Design Tradeoffs
-
-This document explains **intentional decisions**, **rejected alternatives**, and **why the current architecture is correct for AuthGuard’s goals**.
+This document explains **intentional architectural decisions**, **rejected alternatives**, and
+**why the current design is correct for AuthGuard’s goals**.
 
 AuthGuard is not a generic SIEM, WAF, or IAM replacement.
-It is a **behavioral abuse detection and enforcement system** optimized for clarity, correctness, and survivability.
+It is a **behavior-based authentication abuse detection and enforcement system**
+optimized for correctness, explainability, and operational safety.
 
 ---
 
-## 1. Detection vs Prevention
+## 1. Detection vs Enforcement
 
 ### Decision
-
-AuthGuard separates **detection** from **authentication enforcement**.
+AuthGuard separates **detection and decision-making** from **enforcement execution**.
 
 ### Why
-
-* Detection systems must be **observable and explainable**
-* Auth systems must be **fast and deterministic**
-* Coupling both creates brittle failure modes
+- Detection systems must be observable and explainable
+- Enforcement systems must be fast, isolated, and failure-tolerant
+- Coupling both creates brittle failure modes
 
 ### Tradeoff
-
-* Slight latency added by enforcement hop
-* More components to reason about
+- Slight latency from an enforcement hop
+- Additional service boundary
 
 ### Rejected Alternative
-
-Embedding detection logic directly inside auth flows
+Embedding detection directly in authentication flows  
 → Rejected due to:
-
-* Tight coupling
-* Difficult rollback
-* Risk of auth outages
+- Tight coupling
+- Difficult rollback
+- Risk of auth outages
 
 ---
 
 ## 2. Risk Accumulation vs Hard Thresholds
 
 ### Decision
-
-Use **decaying risk scores**, not fixed counters.
+Use **time-decayed risk scoring**, not static counters.
 
 ### Why
-
-* Attackers exploit reset windows
-* Users make mistakes
-* Permanent blocks are operationally dangerous
+- Attackers exploit reset windows
+- Users make mistakes
+- Permanent blocks are operationally dangerous
 
 ### Tradeoff
-
-* Risk math is harder to reason about than counters
-* Requires timestamps and decay logic
+- Risk math is less intuitive than counters
+- Requires timestamped state and decay logic
 
 ### Rejected Alternative
-
-* Fixed rate limits
-* Reset-based counters
+- Fixed rate limits
+- Reset-based counters
 
 These fail under:
-
-* Timing evasion
-* Slow attacks
-* Distributed abuse
+- Timing evasion
+- Low-and-slow attacks
+- Distributed abuse
 
 ---
 
 ## 3. Sliding Windows vs Global Counters
 
 ### Decision
-
-All detection signals use **sliding windows**.
+All detection signals use **sliding time windows**.
 
 ### Why
-
-* Sliding windows model *behavior over time*
-* Prevent “wait-and-reset” attacks
-* Allow gradual recovery
+- Preserve temporal behavior
+- Prevent wait-and-reset evasion
+- Allow natural recovery
 
 ### Tradeoff
-
-* Slight memory overhead
-* More complex state management
+- Slight memory overhead
+- More complex state management
 
 ### Rejected Alternative
-
-Static counters per minute/hour
+Static counters per minute/hour  
 → Too easy to game.
 
 ---
@@ -97,230 +80,193 @@ Static counters per minute/hour
 ## 4. SQLite vs Distributed Databases
 
 ### Decision
-
-Use **SQLite** for logs and metrics.
+Use **SQLite** for event logs and metrics.
 
 ### Why
-
-* Single-node system
-* Deterministic behavior
-* Easy inspection
-* Zero operational overhead
+- Single-node system
+- Deterministic behavior
+- Easy inspection
+- Zero operational overhead
 
 ### Tradeoff
-
-* No horizontal scaling
-* Single-writer limitations
+- No horizontal scaling
+- Single-writer constraints
 
 ### Rejected Alternative
-
-* Redis
-* Postgres
-* ClickHouse
+- Redis
+- Postgres
+- ClickHouse
 
 Rejected because:
-
-* Overkill at this stage
-* Introduces ops complexity
-* Distracts from detection logic
+- Overkill at this stage
+- Adds operational complexity
+- Distracts from detection correctness
 
 ---
 
-## 5. In-Memory State vs Persistent Risk
+## 5. In-Memory Risk vs Persistent Risk
 
 ### Decision
-
-Risk engine state is **in-memory**, blocks are persisted.
+Risk state is **in-memory**, enforcement state is **persisted**.
 
 ### Why
-
-* Risk is transient by nature
-* Persistence increases false positives
-* Blocks must survive restarts
+- Risk is transient by nature
+- Persisted risk causes false positives
+- Enforcement must survive restarts
 
 ### Tradeoff
-
-* Risk resets on restart
-* Requires re-learning behavior
+- Risk resets on restart
+- Behavior must be re-learned
 
 ### Rejected Alternative
-
-Persisting all risk scores
-→ Causes:
-
-* Stale risk
-* Accidental long-term punishment
+Persisting all risk scores  
+→ Leads to stale punishment and poor UX.
 
 ---
 
 ## 6. Go Enforcer vs Python Enforcement
 
 ### Decision
-
-Enforcement is handled by a **Go service**.
+Enforcement is handled by a **separate Go service**.
 
 ### Why
-
-* Concurrency-safe
-* Low latency
-* TTL handling is trivial
-* Clean separation from detection
+- Concurrency-safe
+- Low latency
+- TTL handling is trivial
+- Clean separation from detection
 
 ### Tradeoff
-
-* Two languages
-* IPC overhead
+- Two languages
+- IPC/network overhead
 
 ### Rejected Alternative
-
-Python-based enforcement
+Python-based enforcement  
 → Rejected due to:
-
-* GIL contention
-* Harder concurrency guarantees
+- GIL contention
+- Harder concurrency guarantees
 
 ---
 
 ## 7. Fail-Open / Fail-Closed Modes
 
 ### Decision
-
 Runtime-configurable enforcement modes.
 
 ### Why
-
-* Different environments require different safety guarantees
-* Detection must never block auth unintentionally
+- Different environments require different safety postures
+- Detection must never unintentionally block authentication
 
 ### Tradeoff
-
-* Slightly more logic paths
-* Requires operator awareness
+- More logic paths
+- Requires operator awareness
 
 ### Rejected Alternative
-
-Hardcoded behavior
+Hardcoded behavior  
 → Unsafe in real systems.
 
 ---
 
-## 8. Read-Only Dashboards
+## 8. Operator Dashboards & Controls
 
 ### Decision
-
-Dashboards are **strictly read-only**.
+Dashboards are **mostly read-only**, with **explicit, isolated operator controls**.
 
 ### Why
-
-* Prevent privilege escalation
-* Avoid UI-driven state changes
-* Reduce attack surface
+- Read-only views reduce accidental damage
+- Critical controls (mode toggle, unblock) must still exist
+- Enforcement actions are intentionally narrow and auditable
 
 ### Tradeoff
-
-* No manual overrides from UI
+- Limited operational flexibility
+- Fewer “power-user” features
 
 ### Rejected Alternative
-
-Interactive dashboards
+Fully interactive dashboards  
 → Rejected due to:
-
-* Security risk
-* Audit complexity
+- Larger attack surface
+- Audit complexity
+- Risk of UI-driven outages
 
 ---
 
-## 9. No Charts by Default
+## 9. Tables-First Visualization
 
 ### Decision
-
-Tables > charts for initial UX.
+Use **tables as the primary visualization**, with minimal charts.
 
 ### Why
-
-* Precision over aesthetics
-* Easier to audit
-* Lower frontend complexity
+- Precision over aesthetics
+- Easier auditing
+- Less misleading aggregation
 
 ### Tradeoff
-
-* Less visual appeal
+- Less visual appeal
+- Slower at-a-glance scanning
 
 ### Rejected Alternative
-
-Chart-heavy dashboards
-→ Often hide anomalies and mislead operators.
+Chart-heavy dashboards  
+→ Often hide edge cases and mislead operators.
 
 ---
 
 ## 10. Alerting as Best-Effort
 
 ### Decision
-
-Alerts **never affect auth flow**.
+Alerts never affect authentication flow.
 
 ### Why
-
-* Alerting systems fail
-* Detection must remain stable
+- Alerting systems fail
+- Detection must remain stable
 
 ### Tradeoff
-
-* Alerts may be dropped
-* Requires monitoring alert health separately
+- Alerts may be dropped
+- Alert reliability must be monitored separately
 
 ### Rejected Alternative
-
-Blocking on alert delivery
+Blocking on alert delivery  
 → Dangerous and unacceptable.
 
 ---
 
-## 11. No Authentication on Dashboards (Yet)
+## 11. Dashboard Authentication (Deferred)
 
 ### Decision
-
 Dashboards are currently unauthenticated.
 
 ### Why
-
-* Local / demo environment
-* Focus on core detection
+- Local / demo environment
+- Focus on core detection correctness
 
 ### Tradeoff
-
-* Not production-safe
+- Not production-safe
 
 ### Planned
-
-* Auth middleware
-* Role separation
-* Token-based access
+- Auth middleware
+- Role separation
+- Token-based access
 
 ---
 
 ## 12. Explicit Non-Goals
 
-AuthGuard **does not aim to**:
+AuthGuard does **not** aim to:
+- Replace SIEMs
+- Replace IAM systems
+- Detect application-layer fraud
+- Perform deep packet inspection
 
-* Replace SIEMs
-* Replace IAM systems
-* Detect application-layer fraud
-* Perform DPI or payload inspection
-
-Trying to do these would **weaken** the system.
+Expanding scope would weaken the system.
 
 ---
 
-## 13. Summary of Philosophy
+## 13. Design Philosophy
 
 AuthGuard prioritizes:
-
-* Determinism over cleverness
-* Safety over aggression
-* Observability over opacity
-* Recovery over punishment
-* Separation of concerns over convenience
+- Determinism over cleverness
+- Safety over aggression
+- Explainability over opacity
+- Recovery over punishment
+- Separation of concerns over convenience
 
 Every tradeoff favors **operational trustworthiness**.
 
@@ -328,15 +274,10 @@ Every tradeoff favors **operational trustworthiness**.
 
 ## 14. What Comes Next (Optional)
 
-If extended further, the natural next steps are:
+Possible extensions:
+- Distributed risk sharing
+- Authenticated dashboards
+- Structured alert sinks
+- Policy-as-code
 
-* Multi-node risk sharing
-* Authenticated dashboards
-* Structured alert sinks (Slack, PagerDuty)
-* Policy-as-code
-
-But **the core system is complete**.
-
----
-
-
+**The core system is complete.**

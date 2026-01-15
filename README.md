@@ -2,17 +2,21 @@
 
 ### Behavior-Based Authentication Abuse Detection & Enforcement System
 
-AuthGuard is a **real-time authentication abuse detection system** designed to identify, score, and mitigate malicious login behavior using **behavioral signals and time-decayed risk modeling**.
+AuthGuard is a **real-time authentication abuse detection system** that identifies, scores, and mitigates malicious login behavior using **behavioral signals and time-decayed risk modeling**.
 
-It focuses on **correctness, explainability, and operational safety**, rather than static rate limits or opaque machine-learning models.
+It is designed for **correctness, explainability, and operational safety**, avoiding static rate limits and opaque machine-learning models.
+
+AuthGuard is a **defensive security control**, not an authentication provider.
 
 ---
 
 ## Visual Documentation
 
-<img width="1898" height="860" alt="2026-01-11 13 34 06" src="https://github.com/user-attachments/assets/d36d41d7-298e-4604-b2f5-a8169dc93998" />
-<img width="1896" height="936" alt="2026-01-12 00 35 09" src="https://github.com/user-attachments/assets/15cd741f-c61c-4a48-9c47-159d451007a2" />
-<img width="1560" height="576" alt="2026-01-12 00 36 24" src="https://github.com/user-attachments/assets/004d4cf5-0b77-4fe0-9399-873e37cb3ae7" />
+> Screenshots reflect the real operator UI and system behavior.
+
+<img width="1898" height="860" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/d36d41d7-298e-4604-b2f5-a8169dc93998" />
+<img width="1896" height="936" alt="Detection & Enforcement Views" src="https://github.com/user-attachments/assets/15cd741f-c61c-4a48-9c47-159d451007a2" />
+<img width="1560" height="576" alt="Campaign Correlation" src="https://github.com/user-attachments/assets/004d4cf5-0b77-4fe0-9399-873e37cb3ae7" />
 
 ---
 
@@ -25,9 +29,14 @@ Authentication endpoints are a primary attack surface for:
 * OTP abuse
 * Distributed login abuse
 
-AuthGuard observes authentication activity, evaluates behavioral patterns over time, and produces **deterministic, explainable enforcement decisions**.
+AuthGuard observes authentication activity, evaluates **behavioral patterns over time**, and produces **deterministic, explainable enforcement decisions**.
 
-Decisions are temporary, reversible, and resilient to infrastructure failures.
+All enforcement is:
+
+* Temporary
+* TTL-based
+* Reversible
+* Resilient to infrastructure failures
 
 ---
 
@@ -51,14 +60,20 @@ Client / Simulator
         v
 +------------------------+
 | Detection Engine       |
-| - Signals              |
+| - Behavioral Signals   |
 | - Sliding Windows      |
 +------------------------+
         |
         v
 +------------------------+
+| Campaign Correlation   |
+| - Multi-event linking  |
++------------------------+
+        |
+        v
++------------------------+
 | Risk Engine            |
-| - Decay                |
+| - Time decay           |
 | - Aggregation          |
 +------------------------+
         |
@@ -74,7 +89,7 @@ Client / Simulator
         v                    v
 +----------------+    +-------------------+
 | Go Enforcer    |    | Alerting Engine   |
-| (rate control) |    | (webhook/Slack)   |
+| (TTL control)  |    | (Webhooks)        |
 +----------------+    +-------------------+
         |
         v
@@ -82,18 +97,19 @@ Client / Simulator
 | Persistent Storage     |
 | (SQLite event_log)     |
 +------------------------+
-
 ```
 
 ---
 
 ## Core Capabilities
 
-* **Behavior-based detection** (not request-counting)
+* **Behavior-based detection** (not request counting)
+* **Sliding-window signal analysis**
 * **Time-decayed risk scoring**
-* **Explainable decisions**
+* **Explainable, deterministic decisions**
 * **TTL-based enforcement**
 * **Fail-open / fail-closed modes**
+* **Campaign-level attack correlation**
 * **Read-only operational dashboards**
 * **Built-in attack simulators**
 
@@ -101,7 +117,7 @@ Client / Simulator
 
 ## Detection Model
 
-AuthGuard evaluates authentication events using multiple independent signals:
+AuthGuard evaluates authentication activity using independent behavioral signals.
 
 ### Implemented Signals
 
@@ -112,30 +128,30 @@ AuthGuard evaluates authentication events using multiple independent signals:
   Detects a single IP targeting many users.
 
 * **User Fan-In**
-  Detects a single user being targeted from many IPs.
+  Detects a single user targeted from many IPs.
 
 Each signal:
 
 * Uses a sliding time window
 * Emits a bounded score
-* Naturally decays over time
+* Decays naturally over time
 
-Signals are **composable** and **independent**.
+Signals are **orthogonal and composable**.
 
 ---
 
 ## Risk Engine
 
-Instead of permanent counters, AuthGuard maintains **time-decayed risk per entity**.
+Risk is modeled as a **continuous, time-decayed value** per entity.
 
 Key properties:
 
 * Risk increases with suspicious behavior
-* Risk decays when traffic stops
+* Risk decays when activity stops
 * Sustained attacks overpower decay
-* Normal traffic naturally recovers
+* Benign traffic naturally recovers
 
-Final risk is calculated using the **maximum effective risk** across relevant entities (IP or user).
+Final decisions are driven by the **maximum effective risk** across relevant entities.
 
 ---
 
@@ -153,7 +169,8 @@ Each decision includes:
 
 * Effective risk score
 * Triggered signals
-* Enforcement telemetry
+* Campaign attribution (if applicable)
+* Enforcement metadata
 
 ---
 
@@ -163,23 +180,24 @@ AuthGuard **does not enforce blocks directly**.
 
 Enforcement is delegated to a **separate Go service** to ensure:
 
-* Isolation
-* Reliability
-* Clear ownership boundaries
+* Isolation from detection failures
+* Concurrency safety
+* Low-latency TTL handling
+* Restart resilience
 
 ### Enforcement Characteristics
 
 * TTL-based blocking
-* Automatic unblock after expiry
+* Automatic expiry
 * Block replay on restart
-* Independent failure handling
+* Explicit failure handling
 
 ### Failure Modes
 
-* **Fail-Open**: degrade to CHALLENGE if enforcement is unavailable
-* **Fail-Closed**: continue blocking even if enforcement fails
+* **Fail-Open**: degrade BLOCK → CHALLENGE if enforcement fails
+* **Fail-Closed**: continue blocking even during enforcement degradation
 
-The mode is runtime-configurable.
+Modes are configurable at runtime.
 
 ---
 
@@ -187,27 +205,22 @@ The mode is runtime-configurable.
 
 Alerts are generated when:
 
-* An entity is blocked
+* An entity is BLOCKed
 * Suspicious behavior persists over time
 
 Alerting is:
 
 * Webhook-based
+* Best-effort
 * Non-blocking
-* Failure-tolerant
 
-Alert failures **never impact authentication flow**.
+Alert delivery failures **never affect authentication flow**.
 
 ---
 
 ## Observability
 
-AuthGuard provides structured observability through:
-
-* Persistent event logging
-* Decision explanations
-* Enforcement telemetry
-* Read-only dashboards
+AuthGuard treats observability as a **first-class security control**.
 
 ### Dashboard Capabilities
 
@@ -217,8 +230,10 @@ AuthGuard provides structured observability through:
 * Risk distribution
 * Threat feed (recent blocks)
 * Top risky entities
+* Campaign overview
+* Enforcement state
 
-> Dashboards are intentionally read-only to prevent operational mistakes.
+Dashboards are intentionally **safe by default** and **operator-focused**.
 
 ---
 
@@ -230,16 +245,12 @@ AuthGuard includes attack simulators that exercise the **same ingest pipeline as
 * Credential stuffing
 * OTP abuse
 
-These simulators validate:
+Simulators validate:
 
 * Risk accumulation
 * Risk decay
 * Decision correctness
 * Enforcement behavior
-
----
-
-Detection and enforcement are **intentionally decoupled**.
 
 ---
 
@@ -255,8 +266,8 @@ Detection and enforcement are **intentionally decoupled**.
 ### Enforcement
 
 * Go
-* Token-bucket rate limiting
 * TTL-based block store
+* Token-bucket rate limiting
 
 ### Frontend
 
@@ -272,7 +283,7 @@ Detection and enforcement are **intentionally decoupled**.
 ```http
 POST /events/auth        # Event ingestion
 GET  /logs/              # Event logs
-GET  /blocks/            # Active blocks
+GET  /blocks/            # Active enforcement
 GET  /dashboard/         # Summary stats
 GET  /dashboard/metrics  # Aggregated metrics
 GET  /settings/          # Runtime mode
@@ -283,27 +294,28 @@ POST /settings/mode      # Update fail mode
 
 ## Project Status
 
-**AuthGuard is functionally complete.**
+**AuthGuard v2 is functionally complete.**
 
 ### Implemented
 
 * Detection engine
 * Risk modeling
 * Decision engine
+* Campaign correlation
 * Enforcement
 * Alerting
 * Observability
 * Simulators
-* Dashboard
+* Operator dashboards
 
 ### Optional Enhancements
 
-* Authentication on dashboards
+* Dashboard authentication
 * Container hardening
 * Deployment manifests
-* Cloud-native persistence
+* Distributed state backends
 
-None of these are required for correctness.
+These are **not required for correctness**.
 
 ---
 
@@ -331,8 +343,7 @@ MIT
 
 ---
 
-
-### Final Note
+## Final Note
 
 AuthGuard is designed to reflect **how real security systems are built**:
 

@@ -1,366 +1,274 @@
-Good.
-Below is a **complete, production-grade `architecture.md`** for **AuthGuard**, written to match **your exact system**, codebase, and decisions.
-No filler. No assumptions. No marketing fluff.
+# AuthGuard — Threat Model
 
-You can drop this directly into `docs/architecture.md`.
+## 1. Scope & Purpose
 
----
+This document describes the **threat model for AuthGuard v2**, focusing on:
 
-# AuthGuard — System Architecture
+- What AuthGuard is designed to protect
+- What threats it explicitly mitigates
+- What threats are out of scope by design
+- How architectural decisions reduce risk
 
-## 1. Overview
-
-AuthGuard is a **behavior-based authentication abuse detection and enforcement system** designed to identify, score, and mitigate malicious authentication activity in real time.
-
-Unlike traditional rate-limiting systems that rely on static thresholds, AuthGuard uses **event-driven behavioral signals**, **sliding windows**, and a **decaying risk engine** to make adaptive decisions such as:
-
-* `ALLOW`
-* `CHALLENGE`
-* `BLOCK`
-
-The system is built to be:
-
-* **Stateful**
-* **Explainable**
-* **Fail-safe**
-* **Restart-resilient**
+AuthGuard is a **defensive security control**, not an authentication system, identity provider, or IAM replacement.
 
 ---
 
-## 2. High-Level Architecture
+## 2. System Boundary
 
-```
-Client / Simulator
-        |
-        v
-+--------------------+
-| FastAPI Ingest API |
-|  (/events/auth)   |
-+--------------------+
-        |
-        v
-+------------------------+
-| Event Normalization    |
-| (Raw → Canonical)      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Detection Engine       |
-| - Signals              |
-| - Sliding Windows      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Risk Engine            |
-| - Decay                |
-| - Aggregation          |
-+------------------------+
-        |
-        v
-+------------------------+
-| Decision Engine        |
-| - ALLOW / CHALLENGE / |
-|   BLOCK                |
-+------------------------+
-        |
-        +--------------------+
-        |                    |
-        v                    v
-+----------------+    +-------------------+
-| Go Enforcer    |    | Alerting Engine   |
-| (rate control) |    | (webhook/Slack)   |
-+----------------+    +-------------------+
-        |
-        v
-+------------------------+
-| Persistent Storage     |
-| (SQLite event_log)     |
-+------------------------+
-```
+AuthGuard operates **adjacent to authentication systems**, not inside them.
+
+### In Scope
+- Authentication event ingestion
+- Behavioral detection and correlation
+- Risk scoring and decision-making
+- Enforcement delegation
+- Operator observability
+
+### Out of Scope
+- Credential storage or validation
+- Identity lifecycle management
+- Session management
+- MFA implementation
+
+AuthGuard assumes an **upstream authentication provider** already exists.
 
 ---
 
-## 3. Core Components
+## 3. Assets to Protect
 
-### 3.1 FastAPI Ingest Layer (Python)
+AuthGuard protects **system integrity and availability**, not secrets.
 
-**Purpose**
+Primary assets:
 
-* Accept authentication events from simulators or real systems
-* Normalize attacker-controlled input
-* Guarantee internal consistency
+- Authentication availability
+- User accounts (from abuse)
+- Enforcement correctness
+- Operational visibility
+- Decision integrity
 
-**Key properties**
+Secondary assets:
 
-* Stateless at the API level
-* Strict canonical schema (`AuthEvent`)
-* Defensive parsing (timestamps, IPs, usernames)
-
-**Why FastAPI**
-
-* Async-friendly
-* Typed models
-* Clean router separation
-* Easy observability
+- Event logs
+- Detection state
+- Campaign attribution data
 
 ---
 
-### 3.2 Event Normalization
+## 4. Threat Actors
 
-AuthGuard separates **raw input** from **internal truth**.
+AuthGuard models the following attacker classes:
 
-* Raw events are attacker-controlled
-* Canonical events are strictly validated
+### 4.1 External Attackers
+- Credential stuffing bots
+- Brute-force attackers
+- Distributed login abuse
+- OTP abuse automation
 
-This prevents:
+### 4.2 Low-Sophistication Attackers
+- Scripted tools
+- Reused credential lists
+- Single-IP attacks
 
-* Timestamp poisoning
-* Missing field crashes
-* Schema drift
+### 4.3 Adaptive Adversaries
+- IP rotation
+- Low-and-slow attempts
+- Timing-based evasion
 
-**Design decision**
-
-> Never let detection logic operate on raw input.
-
----
-
-### 3.3 Detection Engine (Signals)
-
-Signals represent **behavioral patterns**, not single failures.
-
-Current signals include:
-
-* Failed login velocity
-* IP fan-out (many users from one IP)
-* User fan-in (many IPs targeting one user)
-
-Each signal:
-
-* Uses a **sliding time window**
-* Produces a **risk score**
-* Is independently configurable
-
-Signals are **orthogonal** and composable.
+### 4.4 Accidental Misuse
+- Misconfigured clients
+- High retry rates from legitimate users
+- Load-testing artifacts
 
 ---
 
-### 3.4 Sliding Window State Store
+## 5. Primary Threats & Mitigations
 
-AuthGuard maintains in-memory state using:
+### 5.1 Brute-Force Attacks
 
-* Deques
-* Hash maps
-* Time-based eviction
+**Threat**
+- Rapid authentication failures against one or more accounts
 
-**Why sliding windows**
-
-* Fixed-rate counters are easy to evade
-* Windows preserve temporal behavior
-* Enable burst detection
-
-Eviction is timestamp-driven, not request-count-driven.
+**Mitigation**
+- Failed login velocity signal
+- Sliding time windows
+- Risk accumulation
+- TTL-based blocking
 
 ---
 
-### 3.5 Risk Engine
+### 5.2 Credential Stuffing
 
-Risk is not binary.
+**Threat**
+- Single IP targeting many users
 
-AuthGuard aggregates signals into a **continuous risk score** per entity.
-
-Key properties:
-
-* Scores **decay over time**
-* Multiple signals stack
-* Entity-scoped (IP or username)
-
-This enables:
-
-* Cool-down behavior after attacks stop
-* Persistent attackers to stay blocked
-* Natural recovery for benign users
+**Mitigation**
+- IP fan-out signal
+- Campaign correlation
+- Sustained risk escalation
 
 ---
 
-### 3.6 Decision Engine
+### 5.3 Account Takeover via Distributed Sources
 
-Risk scores are mapped to actions:
+**Threat**
+- Many IPs attacking one user
 
-| Risk Range | Decision  |
-| ---------- | --------- |
-| Low        | ALLOW     |
-| Medium     | CHALLENGE |
-| High       | BLOCK     |
-
-The decision engine is **pure logic**:
-
-* No I/O
-* No side effects
-* Fully testable
+**Mitigation**
+- User fan-in signal
+- Cross-entity aggregation
+- Risk persistence across IP rotation
 
 ---
 
-### 3.7 Enforcement Layer (Go)
+### 5.4 Low-and-Slow Evasion
 
-AuthGuard separates **detection** from **enforcement**.
+**Threat**
+- Attempts spaced to avoid static thresholds
 
-* Detection runs in Python
-* Enforcement runs in Go
-
-**Why Go**
-
-* Concurrency-safe
-* Low latency
-* Production-style service
-* Clear separation of concerns
-
-The enforcer:
-
-* Receives decisions
-* Applies TTL-based blocks
-* Is restart-resilient
+**Mitigation**
+- Time-decayed risk (not counters)
+- Sliding window evaluation
+- Risk accumulation across windows
 
 ---
 
-### 3.8 Fail-Open / Fail-Closed Modes
+### 5.5 Infrastructure Restart Abuse
 
-AuthGuard supports runtime defense modes:
+**Threat**
+- Attackers exploiting restarts to bypass enforcement
 
-* **Fail-open**: enforcement failure downgrades BLOCK → CHALLENGE
-* **Fail-closed**: BLOCK remains BLOCK even if enforcement fails
-
-This is configurable via `/settings`.
-
-**Reason**
-
-> Security posture must be adjustable without redeploys.
+**Mitigation**
+- Persistent block storage
+- Block replay on startup
+- Restart-resilient enforcement
 
 ---
 
-### 3.9 Alerting Engine
+### 5.6 Enforcement Service Failure
 
-Alerts are emitted when:
+**Threat**
+- Rate limiter crash or network failure
 
-* An entity is BLOCKed
-* Sustained CHALLENGE activity occurs
-
-Properties:
-
-* Non-blocking
-* Best-effort delivery
-* Webhook-based
-* Cannot break auth flow
-
-Alerting is **observability**, not enforcement.
+**Mitigation**
+- Fail-open / fail-closed modes
+- Detection continues independently
+- Enforcement failure never crashes ingest
 
 ---
 
-### 3.10 Persistence Layer
+## 6. Threats Explicitly Not Mitigated
 
-AuthGuard persists **everything** relevant to decisions:
+AuthGuard **does not attempt to solve**:
 
-Stored fields include:
+- Password guessing correctness
+- Credential theft
+- Malware-based account compromise
+- MFA bypass vulnerabilities
+- Insider threats
+- Session hijacking
 
-* Timestamp
-* Entity
-* Endpoint
-* Outcome
-* Decision
-* Risk
-* Enforcement metadata
-* Raw event snapshot
-
-This enables:
-
-* Post-incident analysis
-* Dashboards
-* Replayability
-* Metrics computation
-
-SQLite is used intentionally:
-
-* Deterministic
-* Zero external dependency
-* Easy to replace later
+These are intentionally out of scope.
 
 ---
 
-## 4. Dashboard Architecture
+## 7. Trust Assumptions
 
-The dashboard is **read-only** by design.
+AuthGuard assumes:
 
-* `/dashboard` → summary stats
-* `/dashboard/metrics` → aggregated analytics
-* `/logs` → raw event timeline
+- The upstream authentication system is authoritative
+- Events are eventually delivered (not necessarily ordered)
+- Operators have trusted access to dashboards
+- Infrastructure-level security (TLS, auth) exists outside AuthGuard
 
-Key rules:
-
-* No mutations
-* No side effects
-* Safe math only
-* Missing columns handled gracefully
-
-Frontend polls periodically; backend remains stateless.
+Violating these assumptions is outside this threat model.
 
 ---
 
-## 5. Restart & Recovery Guarantees
+## 8. Abuse of AuthGuard Itself
 
-On backend startup:
+### 8.1 Event Flooding
 
-* Existing blocks are replayed into the Go enforcer
-* No attacker bypass via restart
-* System resumes previous security posture
+**Threat**
+- Attackers flooding `/events/auth`
 
-This is critical for real deployments.
-
----
-
-## 6. Non-Goals (Intentional)
-
-AuthGuard does **not**:
-
-* Replace IAM systems
-* Perform credential validation
-* Store secrets
-* Act as an authentication provider
-
-It is a **security control**, not an auth service.
+**Mitigation**
+- Stateless ingest
+- Lightweight parsing
+- Detection cost bounded by sliding windows
 
 ---
 
-## 7. Design Philosophy
+### 8.2 Poisoned Input
 
-* Behavior > counters
-* Explainability > black boxes
-* Separation of concerns
-* Safe failure modes
-* Minimal magic
+**Threat**
+- Malformed timestamps, entities, or payloads
 
----
-
-## 8. Future Extensions (Planned)
-
-* Distributed state backend (Redis)
-* Prometheus metrics export
-* Authenticated dashboard
-* Multi-tenant support
-* Policy-driven rule DSL
+**Mitigation**
+- Canonical event normalization
+- Defensive parsing
+- Rejection of invalid events
 
 ---
 
-## 9. Summary
+### 8.3 Dashboard Abuse
 
-AuthGuard is designed as a **real security system**, not a demo:
+**Threat**
+- Operator UI misuse
 
-* Adaptive
-* Stateful
-* Observable
-* Restart-safe
-* Production-minded
-
-This architecture intentionally mirrors how modern security controls are built in real environments.
+**Mitigation**
+- Read-only dashboards
+- No state mutation from UI
 
 ---
+
+## 9. Observability as a Security Control
+
+AuthGuard treats **observability as defense**.
+
+Operators can:
+- Inspect decisions
+- Trace triggered signals
+- Correlate campaigns
+- Audit enforcement
+
+This reduces:
+- False positives
+- Silent failures
+- Operator-induced outages
+
+---
+
+## 10. Residual Risk
+
+No security system is perfect.
+
+Residual risks include:
+- Highly distributed botnets
+- Credential reuse outside AuthGuard visibility
+- Attacks below detection thresholds
+
+These are accepted trade-offs.
+
+---
+
+## 11. Design Philosophy
+
+AuthGuard’s threat model prioritizes:
+
+- Explainability over opacity
+- Safety over aggressiveness
+- Correctness over coverage
+- Determinism over ML heuristics
+
+---
+
+## 12. Summary
+
+AuthGuard is designed to **reduce authentication abuse risk**, not eliminate all threats.
+
+Its threat model reflects:
+- Real attacker behavior
+- Real operational constraints
+- Real production trade-offs
+
+This document defines what AuthGuard protects — and just as importantly — what it does not.

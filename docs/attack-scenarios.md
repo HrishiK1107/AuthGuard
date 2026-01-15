@@ -1,75 +1,82 @@
-# Attack Scenarios
+# Attack Scenarios — AuthGuard v2
 
-This document describes realistic authentication abuse scenarios that AuthGuard is designed to detect, score, and mitigate.
+This document describes **realistic authentication abuse scenarios** that AuthGuard v2
+is designed to **detect, correlate, score, and mitigate**.
 
-The goal is to demonstrate **behavioral coverage**, not hypothetical exploits.
+The goal is to demonstrate **behavioral coverage and system correctness**, not hypothetical exploits
+or vulnerability scanning.
 
 ---
 
-## 1. Brute Force Login Attack
+## 1. Brute-Force Login Attack
 
 ### Scenario
-An attacker repeatedly attempts to authenticate against the `/login` endpoint using different passwords for a single user or IP.
+An attacker repeatedly attempts to authenticate against a `/login` endpoint using
+different passwords for a single user or IP.
 
-### Observable Signals
+### Observable Behavior
 - High frequency of failed login attempts
 - Repeated failures within a short time window
-- Consistent target (same username or IP)
+- Consistent targeting of a single entity (IP or username)
 
 ### AuthGuard Detection
-- Sliding window counts failed login attempts
-- Risk score increases per failure
-- Escalation path:
-  - ALLOW → CHALLENGE → BLOCK
+- Failed-login velocity signal triggers
+- Sliding window captures burst behavior
+- Risk accumulates per entity with time decay
+
+### Decision Path
+- `ALLOW` → `CHALLENGE` → `BLOCK`
 
 ### Outcome
-- Temporary block applied to offending entity
-- Event logged with high risk score
-- Visible in dashboard threat feed
+- Temporary, TTL-based block applied
+- Campaign created if behavior persists
+- Decision, risk score, and signals visible in dashboards
 
 ---
 
 ## 2. Credential Stuffing Attack
 
 ### Scenario
-An attacker uses a leaked credential list to attempt logins across many accounts from a single IP or rotating IPs.
+An attacker uses leaked credentials to attempt logins across many accounts from a single IP
+or a rotating set of IPs.
 
-### Observable Signals
-- High login attempt volume
+### Observable Behavior
+- One IP targeting many users (fan-out)
 - Mixed success and failure patterns
-- Broad account targeting
+- Sustained activity over time
 
 ### AuthGuard Detection
-- Aggregate request velocity per entity
-- Failure-heavy pattern across multiple users
-- Risk score accumulates even with partial success
+- IP fan-out signal triggers
+- Risk accumulates even with partial success
+- Campaign correlation groups attempts into a single attack narrative
 
 ### Outcome
-- Entity escalated to CHALLENGE or BLOCK
-- Prevents continued credential testing
-- Dashboard highlights entity as high-risk
+- Escalation to `CHALLENGE` or `BLOCK`
+- Campaign visible in Attack Campaigns view
+- Prevents large-scale credential testing
 
 ---
 
 ## 3. OTP Abuse / OTP Brute Force
 
 ### Scenario
-An attacker repeatedly submits OTP values to `/otp` endpoints attempting to guess verification codes.
+An attacker repeatedly submits OTP values to verification endpoints attempting to guess codes
+or exhaust OTP delivery.
 
-### Observable Signals
-- Rapid repeated OTP failures
-- Very short inter-request intervals
-- Same endpoint repeatedly targeted
+### Observable Behavior
+- Rapid OTP failures
+- Very low inter-request intervals
+- Repeated targeting of OTP endpoints
 
 ### AuthGuard Detection
-- Endpoint-specific tracking
-- Failure density within sliding window
-- Higher risk weight for OTP failures
+- Endpoint-aware failure tracking
+- Higher risk weighting for OTP failures
+- Rapid risk escalation due to sensitive flow
 
 ### Outcome
-- Immediate escalation to BLOCK
-- OTP abuse surfaced clearly in logs
-- Prevents SMS/email OTP exhaustion
+- Immediate escalation to `BLOCK`
+- OTP abuse surfaced clearly in logs and campaigns
+- Prevents SMS/email OTP exhaustion attacks
 
 ---
 
@@ -78,96 +85,124 @@ An attacker repeatedly submits OTP values to `/otp` endpoints attempting to gues
 ### Scenario
 Automated scripts retry authentication flows aggressively without respecting backoff.
 
-### Observable Signals
-- Extremely low request intervals
+### Observable Behavior
 - Uniform request timing
-- Continuous failures
+- Extremely short inter-request intervals
+- Continuous failures without pause
 
 ### AuthGuard Detection
-- Time-based anomaly detection
-- Burst recognition in sliding window
-- Rapid risk score growth
+- Sliding window burst recognition
+- Velocity-based risk increase
+- Decay model prevents overreaction to short spikes
 
 ### Outcome
-- Fast block before resource exhaustion
-- Low false-positive risk due to clear automation signature
+- Fast block before infrastructure exhaustion
+- Low false-positive rate due to clear automation signature
 
 ---
 
 ## 5. Distributed Low-and-Slow Attack
 
 ### Scenario
-An attacker spreads attempts over time to avoid traditional rate limits.
+An attacker deliberately spreads attempts over time to evade static rate limits.
 
-### Observable Signals
-- Failures spaced across time
+### Observable Behavior
 - Sub-threshold request rates
-- Persistent low-risk accumulation
+- Failures spaced across time
+- Persistent but subtle malicious intent
 
 ### AuthGuard Detection
 - Stateful per-entity tracking
-- Risk accumulation across windows
-- Detection based on behavior, not raw rate
+- Risk accumulation across sliding windows
+- Decay slows escalation but does not reset intent
 
 ### Outcome
 - Gradual escalation instead of instant block
-- Avoids missing stealthy attacks
-- Demonstrates advantage over static rate limits
+- Detection of stealthy abuse patterns
+- Demonstrates advantage over fixed counters
 
 ---
 
-## 6. Benign User Mistakes (Non-Attack)
+## 6. Coordinated Multi-Entity Campaign (v2)
+
+### Scenario
+An attacker runs a sustained attack involving:
+- Multiple IPs
+- Multiple users
+- Mixed endpoints
+over an extended time period.
+
+### Observable Behavior
+- Repeated suspicious signals across entities
+- Temporal clustering of abuse
+- Recurrent escalation patterns
+
+### AuthGuard Detection
+- Campaign correlation layer links related events
+- Decisions aggregated under a campaign ID
+- Primary attack vector identified
+
+### Outcome
+- Unified campaign view for operators
+- Clear attribution of attack scope and severity
+- Improved incident understanding without manual correlation
+
+---
+
+## 7. Benign User Mistakes (Non-Attack)
 
 ### Scenario
 A legitimate user mistypes their password multiple times.
 
-### Observable Signals
-- Limited number of failures
+### Observable Behavior
+- Small number of failures
 - Human-like timing
 - Eventual success or cessation
 
 ### AuthGuard Handling
 - Low risk weight per failure
+- Risk decays naturally
 - No aggressive escalation
-- Fail-open behavior unless thresholds exceeded
 
 ### Outcome
 - User experience preserved
 - No unnecessary blocks
-- Demonstrates false-positive control
+- Demonstrates false-positive resistance
 
 ---
 
-## 7. Manual Administrator Block
+## 8. Manual Administrator Block
 
 ### Scenario
-Security operator manually blocks a suspicious entity from the dashboard.
+A security operator manually blocks a suspicious entity via the Enforcement Control UI.
 
-### Observable Signals
-- Human-initiated action
+### Observable Behavior
+- Human-initiated override
 - Explicit enforcement request
 
 ### AuthGuard Handling
-- Manual block overrides detection logic
-- Enforcement applied immediately
+- Manual block bypasses detection logic
+- Enforcement applied immediately via Go enforcer
 - Persisted for restart recovery
 
 ### Outcome
-- Immediate threat containment
-- Clear audit trail in logs
+- Immediate containment
+- Clear audit trail
+- Visible in enforcement and logs dashboards
 
 ---
 
 ## Non-Goals & Out-of-Scope Attacks
 
-AuthGuard intentionally does **not** attempt to detect:
+AuthGuard intentionally does **not** attempt to detect or mitigate:
 
 - SQL injection
 - XSS
 - CSRF
-- Account takeover via malware
+- Malware-based account takeover
 - Session hijacking
 - Botnet fingerprinting
+- Network-layer DDoS
 
 These are handled by **other layers** in a defense-in-depth architecture.
 
@@ -175,12 +210,15 @@ These are handled by **other layers** in a defense-in-depth architecture.
 
 ## Summary
 
-AuthGuard focuses on **authentication abuse**, not generic web attacks.
+AuthGuard v2 focuses on **authentication abuse**, not generic web attacks.
 
 Its strength lies in:
-- Behavioral detection
-- Stateful risk accumulation
-- Controlled escalation
-- Fail-safe enforcement
 
-This makes it effective against real-world attackers while preserving legitimate user experience.
+- Behavioral detection
+- Time-decayed risk modeling
+- Campaign-level correlation
+- Deterministic, explainable decisions
+- Safe, reversible enforcement
+
+This makes AuthGuard effective against real-world attackers
+while preserving availability and legitimate user experience.
