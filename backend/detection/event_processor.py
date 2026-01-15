@@ -19,6 +19,8 @@ from detection.decision_engine import DecisionEngine
 from detection.shared import rules_manager
 from alerts.manager import AlertManager
 from storage.block_store import load_blocks, save_blocks
+from storage.campaign_store import upsert_campaign
+
 
 GO_ENFORCER_URL = os.getenv(
     "ENFORCER_URL",
@@ -160,6 +162,28 @@ class EventProcessor:
         final_decision = base_decision
         if base_decision == "BLOCK" and not enforcement_available:
             final_decision = "CHALLENGE" if mode == "fail-open" else "BLOCK"
+
+        # =========================
+        # 6.5 Campaign Attribution (FIXED)
+        # =========================
+        for signal in triggered_signals:
+            campaign = signal.get("campaign")
+            if not campaign:
+                continue
+
+            upsert_campaign(
+                campaign_id=campaign["campaign_id"],
+                campaign_type=campaign["campaign_type"],
+                entity=signal["entity"],
+                signal_id=signal["signal_id"],
+                risk_score=signal["score"],
+                timestamp=event.timestamp,
+                metadata={
+                    "endpoint": event.endpoint,
+                    "outcome": event.outcome,
+                    "decision": final_decision,
+                }
+            )
 
         # =========================
         # 7. PERSIST BLOCK (v2-critical)

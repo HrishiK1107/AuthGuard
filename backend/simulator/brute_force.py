@@ -34,7 +34,7 @@ def brute_force_attack(
         response = requests.post(API_URL, json=payload)
         result = response.json()
 
-        decision = result["result"]["decision"]
+        decision = result.get("decision")
         risk = result["result"]["risk_score"]
         decision_reason = result["result"]["decision_reason"]
         enforcement = result["result"]["enforcement"]

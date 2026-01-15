@@ -1,15 +1,11 @@
 from fastapi import APIRouter
+from storage.campaign_store import list_campaigns
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
-@router.get("")
 @router.get("/")
-def list_campaigns():
-    """
-    Temporary stub for v2.
-    Frontend-safe empty response.
-    """
+def get_campaigns():
     return {
-        "campaigns": []
+        "campaigns": list_campaigns()
     }

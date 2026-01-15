@@ -31,5 +31,16 @@
     "active": true,
     "source": "manual",
     "created_at": 1768465268888
+  },
+  {
+    "id": "auto::10.0.0.202",
+    "entity": "10.0.0.202",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": 69.78616009545411,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "auto",
+    "created_at": 1768468024144
   }
 ]
