@@ -13,23 +13,20 @@ import Campaigns from "./pages/Campaigns";
 import SystemHealth from "./pages/SystemHealth";
 
 import DashboardV2 from "./pages/DashboardV2";
-import LogsV2 from "./pages/LogsV2"; // ✅ ADD
+import LogsV2 from "./pages/LogsV2";
+import CampaignsV2 from "./pages/CampaignsV2";
 
 export default function App() {
   return (
     <Routes>
-      {/* Redirect root */}
       <Route path="/" element={<Navigate to="/dashboard" />} />
 
-      {/* ===============================
-          V2 STANDALONE PAGES (NO LAYOUT)
-         =============================== */}
+      {/* ===== V2 STANDALONE ===== */}
       <Route path="/dashboard-v2" element={<DashboardV2 />} />
-      <Route path="/logs-v2" element={<LogsV2 />} /> {/* ✅ ADD */}
+      <Route path="/logs-v2" element={<LogsV2 />} />
+      <Route path="/campaigns-v2" element={<CampaignsV2 />} />
 
-      {/* ===============================
-          Main App (WITH LAYOUT)
-         =============================== */}
+      {/* ===== MAIN APP ===== */}
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/logs" element={<Logs />} />
@@ -37,14 +34,8 @@ export default function App() {
         <Route path="/rules" element={<DetectionRules />} />
         <Route path="/blocks" element={<ActiveBlocks />} />
         <Route path="/simulator" element={<AttackSimulator />} />
-
-        {/* Phase 6.6 — System Health */}
         <Route path="/health" element={<SystemHealth />} />
-
-        {/* Phase 6.3 — Enforcement Control */}
         <Route path="/settings" element={<Settings />} />
-
-        {/* Phase 6.2 — Decision Explorer */}
         <Route path="/decision/:eventId" element={<DecisionExplorer />} />
       </Route>
     </Routes>
