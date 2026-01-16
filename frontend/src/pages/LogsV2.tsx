@@ -150,7 +150,7 @@ export default function LogsV2() {
 
         <div className="logs-v2-divider" />
 
-        <h1 className="logs-v2-title">Logs & Events</h1>
+        <h1 className="logs-v2-title">LOGS & EVENTS</h1>
 
         {/* FILTERS */}
         <div className="flex items-center gap-4 mb-4">
