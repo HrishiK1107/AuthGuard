@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   FileText,
@@ -12,14 +13,14 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Logs", icon: FileText },
-  { label: "Campaigns", icon: Radar },
-  { label: "Detection Rules", icon: ListChecks },
-  { label: "Active Blocks", icon: Ban },
-  { label: "Attack Simulator", icon: Bug },
-  { label: "System Health", icon: HeartPulse },
-  { label: "Enforcement Control", icon: Shield },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Logs", icon: FileText, path: "/logs" },
+  { label: "Campaigns", icon: Radar, path: "/campaigns" },
+  { label: "Detection Rules", icon: ListChecks, path: "/rules" },
+  { label: "Active Blocks", icon: Ban, path: "/blocks" },
+  { label: "Attack Simulator", icon: Bug, path: "/simulator" },
+  { label: "System Health", icon: HeartPulse, path: "/health" },
+  { label: "Enforcement Control", icon: Shield, path: "/settings" },
 ];
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
@@ -59,17 +60,18 @@ export default function DashboardV2() {
         </div>
 
         <nav className="auth-v2-nav-items">
-          {NAV_ITEMS.map(({ label, icon: Icon }) => (
-            <div
+          {NAV_ITEMS.map(({ label, icon: Icon, path }) => (
+            <NavLink
               key={label}
-              className={`auth-v2-nav-item ${
-                label === "Dashboard" ? "active" : ""
-              }`}
+              to={path}
+              className={({ isActive }) =>
+                `auth-v2-nav-item ${isActive ? "active" : ""}`
+              }
               tabIndex={0}
             >
               <Icon size={22} className="auth-v2-nav-icon" />
               {!collapsed && <span>{label}</span>}
-            </div>
+            </NavLink>
           ))}
         </nav>
       </aside>
@@ -232,5 +234,5 @@ export default function DashboardV2() {
         </div>
       </main>
     </div>
-  );
+  );  
 }

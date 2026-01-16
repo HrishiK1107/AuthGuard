@@ -1,0 +1,43 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+
+import Layout from "./components/layout/layout";
+
+/* ===== V2 PAGES (CANONICAL) ===== */
+import DashboardV2 from "./pages/DashboardV2";
+import LogsV2 from "./pages/LogsV2";
+import CampaignsV2 from "./pages/CampaignsV2";
+import DetectionRulesV2 from "./pages/DetectionRulesV2";
+import ActiveBlocksV2 from "./pages/ActiveBlocksV2";
+import AttackSimulatorV2 from "./pages/AttackSimulatorV2";
+import SystemHealthV2 from "./pages/SystemHealthV2";
+import SettingsV2 from "./pages/SettingsV2";
+
+/* ===== SHARED / NON-V2 ===== */
+import DecisionExplorer from "./pages/DecisionExplorer";
+
+export default function AppV2() {
+  return (
+    <Routes>
+      {/* Root redirect */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+      {/* Main App Shell */}
+      <Route element={<Layout />}>
+        <Route path="/dashboard" element={<DashboardV2 />} />
+        <Route path="/logs" element={<LogsV2 />} />
+        <Route path="/campaigns" element={<CampaignsV2 />} />
+        <Route path="/rules" element={<DetectionRulesV2 />} />
+        <Route path="/blocks" element={<ActiveBlocksV2 />} />
+        <Route path="/simulator" element={<AttackSimulatorV2 />} />
+        <Route path="/health" element={<SystemHealthV2 />} />
+
+        {/* Enforcement Control */}
+        <Route path="/enforcement" element={<SettingsV2 />} />
+        <Route path="/settings" element={<SettingsV2 />} />
+
+        {/* Decision Explorer (shared) */}
+        <Route path="/decision/:eventId" element={<DecisionExplorer />} />
+      </Route>
+    </Routes>
+  );
+}
