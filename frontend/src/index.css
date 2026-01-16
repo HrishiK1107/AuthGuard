@@ -492,3 +492,77 @@ body {
 .auth-card.defense-blocking .auth-card-value {
   color: #ef4444;
 }
+
+/* ======================================================
+   LOGS V2 — TYPOGRAPHY & SPACING OVERRIDES
+   (Standalone, non-breaking)
+====================================================== */
+
+/* Page title */
+.logs-v2-title {
+  font-size: 1.85rem;          /* ~65% increase from text-lg */
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+}
+
+/* Divider under top bar */
+.logs-v2-divider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.08),
+    rgba(255,255,255,0.02),
+    rgba(255,255,255,0)
+  );
+  margin: 18px 0 24px 0;
+}
+
+/* Table headers */
+table thead th {
+  font-size: 0.95rem;          /* +45% */
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Table body rows */
+table tbody td {
+  font-size: 0.95rem;          /* +45% */
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+/* Expanded row content */
+table tbody tr + tr td {
+  font-size: 0.9rem;
+}
+
+/* LOGS V2 */
+.logs-v2-divider {
+  height: 1px;
+  background: #1f1f1f;
+  margin: 14px 0 22px;
+}
+
+.logs-v2-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.logs-v2-filters {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.logs-v2-filters input,
+.logs-v2-filters select {
+  background: #0e0e0e;
+  border: 1px solid #2a2a2a;
+  padding: 8px 14px;
+  border-radius: 10px;
+  color: #e5e7eb;
+}
