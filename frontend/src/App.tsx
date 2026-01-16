@@ -10,6 +10,7 @@ import Settings from './pages/Settings'
 import DecisionExplorer from './pages/DecisionExplorer'
 import Campaigns from './pages/Campaigns'
 import SystemHealth from './pages/SystemHealth'
+import DashboardV2 from './pages/DashboardV2'
 
 export default function App() {
   return (
@@ -17,7 +18,14 @@ export default function App() {
       {/* Redirect root */}
       <Route path="/" element={<Navigate to="/dashboard" />} />
 
-      {/* Layout wrapper */}
+      {/* ===============================
+          Dashboard V2 (NO LAYOUT)
+         =============================== */}
+      <Route path="/dashboard-v2" element={<DashboardV2 />} />
+
+      {/* ===============================
+          Main App (WITH LAYOUT)
+         =============================== */}
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/logs" element={<Logs />} />

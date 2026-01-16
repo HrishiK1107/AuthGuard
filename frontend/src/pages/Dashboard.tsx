@@ -76,6 +76,7 @@ export default function Dashboard() {
   });
 
   const [activeBlocksCount, setActiveBlocksCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,13 +101,14 @@ export default function Dashboard() {
         setTimeline(metrics.timeline);
         setRiskDistribution(metrics.risk_distribution);
 
-        // NEW: Active Blocks (live enforcement)
         const blocksRes =
           await apiGet<{ blocks: Block[] }>("/blocks/");
         const activeCount = blocksRes.blocks.filter(
           (b) => b.active
         ).length;
         setActiveBlocksCount(activeCount);
+
+        setLastUpdated(Date.now());
       } catch (err) {
         console.error("Dashboard fetch failed", err);
       }
@@ -117,12 +119,20 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const updatedAgo =
+    lastUpdated !== null
+      ? `${Math.floor((Date.now() - lastUpdated) / 1000)}s ago`
+      : "—";
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-lg font-semibold">Dashboard</h1>
         <p className="text-sm text-neutral-400">
-          Real-time security overview and system status.
+          Real-time authentication abuse detection · Sliding window
+        </p>
+        <p className="text-xs text-neutral-500">
+          Last updated: {updatedAgo}
         </p>
       </div>
 
@@ -134,18 +144,27 @@ export default function Dashboard() {
           <span className="text-2xl font-bold">
             {summary.total_events}
           </span>
+          <p className="text-xs text-neutral-500 mt-1">
+            Last 15 min · sliding window
+          </p>
         </Card>
 
         <Card title="Blocked Events">
           <span className="text-2xl font-bold text-red-500">
             {summary.decision_breakdown["BLOCK"] ?? 0}
           </span>
+          <p className="text-xs text-neutral-500 mt-1">
+            Enforced decisions
+          </p>
         </Card>
 
         <Card title="Active Blocks">
           <span className="text-2xl font-bold text-red-400">
             {activeBlocksCount}
           </span>
+          <p className="text-xs text-neutral-500 mt-1">
+            Live enforcement rules
+          </p>
         </Card>
 
         <Card title="Mitigation Rate">
@@ -154,6 +173,9 @@ export default function Dashboard() {
               ? `${blockedPercent}%`
               : "—"}
           </span>
+          <p className="text-xs text-neutral-500 mt-1">
+            Blocked + challenged events
+          </p>
         </Card>
 
         <Card title="Defense Mode">
@@ -166,6 +188,9 @@ export default function Dashboard() {
           >
             {defenseMode}
           </span>
+          <p className="text-xs text-neutral-500 mt-1">
+            Policy: {defenseMode === "ACTIVE" ? "Fail-Closed" : "Fail-Open"}
+          </p>
         </Card>
       </div>
 
@@ -184,7 +209,7 @@ export default function Dashboard() {
                 colSpan={4}
                 className="px-4 py-6 text-center text-neutral-500 italic"
               >
-                No timeline data
+                Waiting for live authentication traffic…
               </td>
             </tr>
           ) : (
@@ -197,22 +222,13 @@ export default function Dashboard() {
                   {row.hour}
                 </td>
                 <td className="px-4 py-2">
-                  <StatusBadge
-                    label={String(row.ALLOW)}
-                    status="low"
-                  />
+                  <StatusBadge label={String(row.ALLOW)} status="low" />
                 </td>
                 <td className="px-4 py-2">
-                  <StatusBadge
-                    label={String(row.CHALLENGE)}
-                    status="medium"
-                  />
+                  <StatusBadge label={String(row.CHALLENGE)} status="medium" />
                 </td>
                 <td className="px-4 py-2">
-                  <StatusBadge
-                    label={String(row.BLOCK)}
-                    status="high"
-                  />
+                  <StatusBadge label={String(row.BLOCK)} status="high" />
                 </td>
               </tr>
             ))
@@ -228,28 +244,28 @@ export default function Dashboard() {
           Risk Distribution
         </h2>
 
-        <Table headers={["Risk Level", "Events", "Severity"]}>
+        <Table headers={["Risk Level", "Events", "Meaning"]}>
           <tr className="border-t border-neutral-800">
             <td className="px-4 py-2 font-mono">LOW</td>
             <td className="px-4 py-2">{riskDistribution.low}</td>
-            <td className="px-4 py-2">
-              <StatusBadge label="LOW" status="low" />
+            <td className="px-4 py-2 text-neutral-400">
+              Normal background noise
             </td>
           </tr>
 
           <tr className="border-t border-neutral-800">
             <td className="px-4 py-2 font-mono">MEDIUM</td>
             <td className="px-4 py-2">{riskDistribution.medium}</td>
-            <td className="px-4 py-2">
-              <StatusBadge label="MEDIUM" status="medium" />
+            <td className="px-4 py-2 text-neutral-400">
+              Suspicious patterns
             </td>
           </tr>
 
           <tr className="border-t border-neutral-800">
             <td className="px-4 py-2 font-mono">HIGH</td>
             <td className="px-4 py-2">{riskDistribution.high}</td>
-            <td className="px-4 py-2">
-              <StatusBadge label="HIGH" status="high" />
+            <td className="px-4 py-2 text-neutral-400">
+              Active abuse
             </td>
           </tr>
         </Table>
@@ -260,25 +276,17 @@ export default function Dashboard() {
       ========================= */}
       <div>
         <h2 className="text-sm font-medium text-neutral-300 mb-2">
-          Recent Threats (Blocked)
+          Recent Threats (Risk-Weighted)
         </h2>
 
-        <Table
-          headers={[
-            "Time",
-            "Entity",
-            "Endpoint",
-            "Risk",
-            "Decision",
-          ]}
-        >
+        <Table headers={["Time", "Entity", "Endpoint", "Risk", "Decision"]}>
           {threats.length === 0 ? (
             <tr>
               <td
                 colSpan={5}
                 className="px-4 py-6 text-center text-neutral-500 italic"
               >
-                No active threats
+                No active abuse detected
               </td>
             </tr>
           ) : (
@@ -300,10 +308,7 @@ export default function Dashboard() {
                   {t.risk.toFixed(2)}
                 </td>
                 <td className="px-4 py-2">
-                  <StatusBadge
-                    label={t.decision}
-                    status="high"
-                  />
+                  <StatusBadge label={t.decision} status="high" />
                 </td>
               </tr>
             ))
@@ -319,14 +324,14 @@ export default function Dashboard() {
           Top Active Entities
         </h2>
 
-        <Table headers={["Entity", "Event Count"]}>
+        <Table headers={["Entity", "Events"]}>
           {summary.top_entities.length === 0 ? (
             <tr>
               <td
                 colSpan={2}
                 className="px-4 py-6 text-center text-neutral-500 italic"
               >
-                No active entities
+                No entities exceeding baseline
               </td>
             </tr>
           ) : (
@@ -338,10 +343,8 @@ export default function Dashboard() {
                 <td className="px-4 py-2 font-mono">
                   {item.entity}
                 </td>
-                <td className="px-4 py-2">
-                  <div className="text-right font-mono pr-6">
-                    {item.count}
-                  </div>
+                <td className="px-4 py-2 text-right font-mono pr-6">
+                  {item.count}
                 </td>
               </tr>
             ))
