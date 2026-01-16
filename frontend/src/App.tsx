@@ -15,6 +15,9 @@ import SystemHealth from "./pages/SystemHealth";
 import DashboardV2 from "./pages/DashboardV2";
 import LogsV2 from "./pages/LogsV2";
 import CampaignsV2 from "./pages/CampaignsV2";
+import DetectionRulesV2 from "./pages/DetectionRulesV2";
+import ActiveBlocksV2 from "./pages/ActiveBlocksV2";
+import AttackSimulatorV2 from "./pages/AttackSimulatorV2";  
 
 export default function App() {
   return (
@@ -25,6 +28,9 @@ export default function App() {
       <Route path="/dashboard-v2" element={<DashboardV2 />} />
       <Route path="/logs-v2" element={<LogsV2 />} />
       <Route path="/campaigns-v2" element={<CampaignsV2 />} />
+      <Route path="/rules-v2" element={<DetectionRulesV2 />} />
+      <Route path="/blocks-v2" element={<ActiveBlocksV2 />} />
+      <Route path="/simulator-v2" element={<AttackSimulatorV2 />} />
 
       {/* ===== MAIN APP ===== */}
       <Route element={<Layout />}>
@@ -36,7 +42,10 @@ export default function App() {
         <Route path="/simulator" element={<AttackSimulator />} />
         <Route path="/health" element={<SystemHealth />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/decision/:eventId" element={<DecisionExplorer />} />
+        <Route
+          path="/decision/:eventId"
+          element={<DecisionExplorer />}
+        />
       </Route>
     </Routes>
   );
