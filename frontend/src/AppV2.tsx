@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import Layout from "./components/layout/layout";
+/* ===== APP SHELL (ICON RAIL) ===== */
+import AppShell from "./components/layout/AppShell";
 
 /* ===== V2 PAGES (CANONICAL) ===== */
 import DashboardV2 from "./pages/DashboardV2";
@@ -21,8 +22,8 @@ export default function AppV2() {
       {/* Root redirect */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Main App Shell */}
-      <Route element={<Layout />}>
+      {/* Main App Shell (VS Code–style icon rail) */}
+      <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardV2 />} />
         <Route path="/logs" element={<LogsV2 />} />
         <Route path="/campaigns" element={<CampaignsV2 />} />

@@ -1,7 +1,6 @@
 // frontend/pages/DetectionRulesV2.tsx
 
-import { useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { useMemo } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -116,47 +115,10 @@ function loadedPill(loaded: boolean) {
    DETECTION RULES V2
 ========================= */
 export default function DetectionRulesV2() {
-  const [collapsed, setCollapsed] = useState(false);
   const rules = useMemo(() => MOCK_RULES, []);
 
   return (
     <div className="auth-v2-root">
-      {/* SIDEBAR */}
-      <aside className={`auth-v2-nav ${collapsed ? "collapsed" : ""}`}>
-        <div className="auth-v2-nav-header">
-          {!collapsed && (
-            <div className="auth-v2-logo-wrap">
-              <div className="auth-v2-logo-main">AUTHGUARD</div>
-              <div className="auth-v2-logo-sub">Auth Abuse Defense</div>
-            </div>
-          )}
-
-          <button
-            className="auth-v2-collapse-btn"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <ChevronLeft size={18} className={collapsed ? "rotate" : ""} />
-          </button>
-        </div>
-
-        <nav className="auth-v2-nav-items">
-          {NAV_ITEMS.map(({ label, icon: Icon, path }) => (
-            <NavLink
-              key={label}
-              to={path}
-              className={({ isActive }) =>
-                `auth-v2-nav-item ${isActive ? "active" : ""}`
-              }
-              tabIndex={0}
-            >
-              <Icon size={22} className="auth-v2-nav-icon" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
       {/* MAIN */}
       <main className="auth-v2-main">
         {/* TOP BAR */}
@@ -246,7 +208,6 @@ export default function DetectionRulesV2() {
                     </td>
                   </tr>
 
-                  {/* SUBTLE ROW SEPARATOR */}
                   <tr>
                     <td colSpan={11} className="p-0">
                       <div className="h-px bg-gradient-to-r from-transparent via-neutral-800 to-transparent" />

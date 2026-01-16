@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   FileText,
@@ -75,7 +74,6 @@ function Sparkline({ values }: { values: number[] }) {
    LOGS V2
 ========================= */
 export default function LogsV2() {
-  const [collapsed, setCollapsed] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const [entityFilter, setEntityFilter] = useState("");
@@ -102,39 +100,6 @@ export default function LogsV2() {
 
   return (
     <div className="auth-v2-root">
-      {/* SIDEBAR */}
-      <aside className={`auth-v2-nav ${collapsed ? "collapsed" : ""}`}>
-        <div className="auth-v2-nav-header">
-          {!collapsed && (
-            <div className="auth-v2-logo-wrap">
-              <div className="auth-v2-logo-main">AUTHGUARD</div>
-              <div className="auth-v2-logo-sub">Auth Abuse Defense</div>
-            </div>
-          )}
-          <button
-            className="auth-v2-collapse-btn"
-            onClick={() => setCollapsed(!collapsed)}
-          >
-            <ChevronLeft size={18} className={collapsed ? "rotate" : ""} />
-          </button>
-        </div>
-
-        <nav className="auth-v2-nav-items">
-          {NAV_ITEMS.map(({ label, icon: Icon, path }) => (
-            <NavLink
-              key={label}
-              to={path}
-              className={({ isActive }) =>
-                `auth-v2-nav-item ${isActive ? "active" : ""}`
-              }
-            >
-              <Icon size={22} className="auth-v2-nav-icon" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
       {/* MAIN */}
       <main className="auth-v2-main">
         {/* TOP BAR */}
@@ -165,7 +130,6 @@ export default function LogsV2() {
             onChange={e => setEntityFilter(e.target.value)}
           />
 
-          {/* DECISION */}
           <div className="relative">
             <select
               className="h-10 w-44 px-4 pr-10 rounded-md bg-neutral-900 border border-neutral-700 text-sm font-medium text-neutral-200 appearance-none focus:outline-none"
@@ -182,7 +146,6 @@ export default function LogsV2() {
             </span>
           </div>
 
-          {/* ENDPOINT */}
           <div className="relative">
             <select
               className="h-10 w-44 px-4 pr-10 rounded-md bg-neutral-900 border border-neutral-700 text-sm font-medium text-neutral-200 appearance-none focus:outline-none"

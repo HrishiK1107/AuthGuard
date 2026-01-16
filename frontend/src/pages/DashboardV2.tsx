@@ -1,27 +1,4 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
-import {
-  LayoutDashboard,
-  FileText,
-  Radar,
-  ListChecks,
-  Ban,
-  Bug,
-  HeartPulse,
-  Shield,
-  ChevronLeft,
-} from "lucide-react";
-
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Logs", icon: FileText, path: "/logs" },
-  { label: "Campaigns", icon: Radar, path: "/campaigns" },
-  { label: "Detection Rules", icon: ListChecks, path: "/rules" },
-  { label: "Active Blocks", icon: Ban, path: "/blocks" },
-  { label: "Attack Simulator", icon: Bug, path: "/simulator" },
-  { label: "System Health", icon: HeartPulse, path: "/health" },
-  { label: "Enforcement Control", icon: Shield, path: "/settings" },
-];
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
@@ -32,50 +9,12 @@ const ACTIVE_BLOCKS = 3; // > 0 => blink
 const DEFENSE_MODE: "MONITOR" | "ACTIVE" | "BLOCKING" = "MONITOR";
 
 export default function DashboardV2() {
-  const [collapsed, setCollapsed] = useState(false);
-
   const handleCardClick = (target: string) => {
     console.log(`[INTENT] Navigate to ${target}`);
   };
 
   return (
     <div className="auth-v2-root">
-      {/* SIDEBAR */}
-      <aside className={`auth-v2-nav ${collapsed ? "collapsed" : ""}`}>
-        <div className="auth-v2-nav-header">
-          {!collapsed && (
-            <div className="auth-v2-logo-wrap">
-              <div className="auth-v2-logo-main">AUTHGUARD</div>
-              <div className="auth-v2-logo-sub">Auth Abuse Defense</div>
-            </div>
-          )}
-
-          <button
-            className="auth-v2-collapse-btn"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <ChevronLeft size={18} className={collapsed ? "rotate" : ""} />
-          </button>
-        </div>
-
-        <nav className="auth-v2-nav-items">
-          {NAV_ITEMS.map(({ label, icon: Icon, path }) => (
-            <NavLink
-              key={label}
-              to={path}
-              className={({ isActive }) =>
-                `auth-v2-nav-item ${isActive ? "active" : ""}`
-              }
-              tabIndex={0}
-            >
-              <Icon size={22} className="auth-v2-nav-icon" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
       {/* MAIN */}
       <main className="auth-v2-main">
         {/* TOP BAR */}
@@ -234,5 +173,5 @@ export default function DashboardV2() {
         </div>
       </main>
     </div>
-  );  
+  );
 }

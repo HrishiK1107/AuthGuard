@@ -1,81 +1,19 @@
 // frontend/pages/ActiveBlocksV2.tsx
 
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
-import {
-  LayoutDashboard,
-  FileText,
-  Radar,
-  ListChecks,
-  Ban,
-  Bug,
-  HeartPulse,
-  Shield,
-  ChevronLeft,
-} from "lucide-react";
-
-/* =========================
-   SIDEBAR CONFIG
-========================= */
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Logs", icon: FileText, path: "/logs" },
-  { label: "Campaigns", icon: Radar, path: "/campaigns" },
-  { label: "Detection Rules", icon: ListChecks, path: "/rules" },
-  { label: "Active Blocks", icon: Ban, path: "/blocks" },
-  { label: "Attack Simulator", icon: Bug, path: "/simulator" },
-  { label: "System Health", icon: HeartPulse, path: "/health" },
-  { label: "Enforcement Control", icon: Shield, path: "/settings" },
-];
-
-const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
 /* =========================
    ACTIVE BLOCKS V2
 ========================= */
+const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
+
 export default function ActiveBlocksV2() {
-  const [collapsed, setCollapsed] = useState(false);
   const [entity, setEntity] = useState("");
 
   const blockDisabled = entity.trim().length === 0;
 
   return (
     <div className="auth-v2-root">
-      {/* SIDEBAR */}
-      <aside className={`auth-v2-nav ${collapsed ? "collapsed" : ""}`}>
-        <div className="auth-v2-nav-header">
-          {!collapsed && (
-            <div className="auth-v2-logo-wrap">
-              <div className="auth-v2-logo-main">AUTHGUARD</div>
-              <div className="auth-v2-logo-sub">Auth Abuse Defense</div>
-            </div>
-          )}
-
-          <button
-            className="auth-v2-collapse-btn"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label="Toggle sidebar"
-          >
-            <ChevronLeft size={18} className={collapsed ? "rotate" : ""} />
-          </button>
-        </div>
-
-        <nav className="auth-v2-nav-items">
-          {NAV_ITEMS.map(({ label, icon: Icon, path }) => (
-            <NavLink
-              key={label}
-              to={path}
-              className={({ isActive }) =>
-                `auth-v2-nav-item ${isActive ? "active" : ""}`
-              }
-            >
-              <Icon size={22} className="auth-v2-nav-icon" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
       {/* MAIN */}
       <main className="auth-v2-main">
         {/* TOP BAR */}
