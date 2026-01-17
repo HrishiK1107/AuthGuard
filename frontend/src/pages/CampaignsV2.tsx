@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -8,8 +8,10 @@ import {
   Bug,
   HeartPulse,
   Shield,
-  ChevronLeft,
 } from "lucide-react";
+
+import { getCampaignsV2 } from "../services/campaigns";
+import type { Campaign } from "../services/campaigns";
 
 /* =========================
    SIDEBAR CONFIG
@@ -28,74 +30,40 @@ const NAV_ITEMS = [
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
 /* =========================
-   MOCK CAMPAIGN DATA
+   HELPERS (UI VIEW MODEL)
 ========================= */
-type Campaign = {
-  id: string;
-  primaryVector: string;
-  start: number;
-  lastSeen: number;
-  events: number;
-  entities: number;
-  risk: "LOW" | "MEDIUM" | "HIGH";
-  decisions: {
-    allow: number;
-    challenge: number;
-    block: number;
-  };
-  state: "ACTIVE" | "COOLING" | "ENDED";
-};
 
-const MOCK_CAMPAIGNS: Campaign[] = [
-  {
-    id: "IP:10.0.0.69",
-    primaryVector: "IP",
-    start: Date.now() - 120_000,
-    lastSeen: Date.now() - 120_000,
-    events: 0,
-    entities: 1,
-    risk: "LOW",
-    decisions: { allow: 0, challenge: 0, block: 0 },
-    state: "ENDED",
-  },
-  {
-    id: "IP:10.0.0.202",
-    primaryVector: "IP",
-    start: Date.now() - 90_000,
-    lastSeen: Date.now() - 90_000,
-    events: 0,
-    entities: 1,
-    risk: "LOW",
-    decisions: { allow: 0, challenge: 0, block: 0 },
-    state: "ENDED",
-  },
-  {
-    id: "IP:10.0.0.203",
-    primaryVector: "IP",
-    start: Date.now() - 150_000,
-    lastSeen: Date.now() - 150_000,
-    events: 0,
-    entities: 1,
-    risk: "LOW",
-    decisions: { allow: 0, challenge: 0, block: 0 },
-    state: "ENDED",
-  },
-];
-
-/* =========================
-   HELPERS
-========================= */
-function formatTs(ts: number) {
-  return new Date(ts).toLocaleString();
+function formatTs(ts: number | null) {
+  if (!ts) return "—";
+  return new Date(ts * 1000).toLocaleString();
 }
 
-function riskColor(risk: Campaign["risk"]) {
+function riskBucket(score: number): "LOW" | "MEDIUM" | "HIGH" {
+  if (score >= 70) return "HIGH";
+  if (score >= 40) return "MEDIUM";
+  return "LOW";
+}
+
+function riskColor(risk: "LOW" | "MEDIUM" | "HIGH") {
   if (risk === "HIGH") return "text-red-400";
   if (risk === "MEDIUM") return "text-yellow-400";
   return "text-green-400";
 }
 
-function stateBadge(state: Campaign["state"]) {
+function stateFromTimestamps(
+  lastSeen: number | null
+): "ACTIVE" | "COOLING" | "ENDED" {
+  if (!lastSeen) return "ENDED";
+
+  const now = Math.floor(Date.now() / 1000);
+  const age = now - lastSeen;
+
+  if (age < 60) return "ACTIVE";
+  if (age < 300) return "COOLING";
+  return "ENDED";
+}
+
+function stateBadge(state: "ACTIVE" | "COOLING" | "ENDED") {
   if (state === "ACTIVE")
     return "bg-green-900/40 text-green-400 border border-green-700";
   if (state === "COOLING")
@@ -107,7 +75,43 @@ function stateBadge(state: Campaign["state"]) {
    CAMPAIGNS V2
 ========================= */
 export default function CampaignsV2() {
-  const campaigns = useMemo(() => MOCK_CAMPAIGNS, []);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCampaignsV2()
+      .then((res) => setCampaigns(res.campaigns))
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load campaigns");
+      });
+  }, []);
+
+  const viewModels = useMemo(() => {
+    return campaigns.map((c) => {
+      const risk = riskBucket(c.risk_score);
+
+      return {
+        id: c.campaign_id,
+        primaryVector: "ENTITY",
+        start: c.start_ts,
+        lastSeen: c.last_seen_ts,
+        events: c.signals.length,
+        entities: 1,
+        risk,
+        decisions: {
+          allow: c.decision === "ALLOW" ? c.signals.length : 0,
+          challenge: c.decision === "CHALLENGE" ? c.signals.length : 0,
+          block: c.decision === "BLOCK" ? c.signals.length : 0,
+        },
+        state: stateFromTimestamps(c.last_seen_ts),
+      };
+    });
+  }, [campaigns]);
+
+  if (error) {
+    return <div className="auth-v2-root">{error}</div>;
+  }
 
   return (
     <div className="auth-v2-root">
@@ -125,7 +129,7 @@ export default function CampaignsV2() {
               <span className="health-dot" />
               SYSTEM: {SYSTEM_STATUS.toUpperCase()}
             </span>
-            <span className="auth-pill">RISK: LOW</span>
+            <span className="auth-pill">LIVE DATA</span>
           </div>
         </div>
 
@@ -155,7 +159,7 @@ export default function CampaignsV2() {
             </thead>
 
             <tbody>
-              {campaigns.map((c) => (
+              {viewModels.map((c) => (
                 <>
                   <tr
                     key={c.id}
@@ -164,11 +168,21 @@ export default function CampaignsV2() {
                     <td className="px-4 py-[18px] font-mono text-sm">
                       {c.id}
                     </td>
-                    <td className="px-4 py-[18px]">{c.primaryVector}</td>
-                    <td className="px-4 py-[18px]">{formatTs(c.start)}</td>
-                    <td className="px-4 py-[18px]">{formatTs(c.lastSeen)}</td>
-                    <td className="px-4 py-[18px]">{c.events}</td>
-                    <td className="px-4 py-[18px]">{c.entities}</td>
+                    <td className="px-4 py-[18px]">
+                      {c.primaryVector}
+                    </td>
+                    <td className="px-4 py-[18px]">
+                      {formatTs(c.start)}
+                    </td>
+                    <td className="px-4 py-[18px]">
+                      {formatTs(c.lastSeen)}
+                    </td>
+                    <td className="px-4 py-[18px]">
+                      {c.events}
+                    </td>
+                    <td className="px-4 py-[18px]">
+                      {c.entities}
+                    </td>
                     <td
                       className={`px-4 py-[18px] font-semibold ${riskColor(
                         c.risk
@@ -177,8 +191,9 @@ export default function CampaignsV2() {
                       {c.risk}
                     </td>
                     <td className="px-4 py-[18px] text-xs font-mono">
-                      A:{c.decisions.allow} · C:{c.decisions.challenge} ·
-                      B:{c.decisions.block}
+                      A:{c.decisions.allow} · C:
+                      {c.decisions.challenge} · B:
+                      {c.decisions.block}
                     </td>
                     <td className="px-4 py-[18px]">
                       <span
