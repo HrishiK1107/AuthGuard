@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -10,6 +10,9 @@ import {
   Shield,
   ChevronLeft,
 } from "lucide-react";
+
+import { getLogsV2 } from "../services/logs";
+import type { LogEntry } from "../services/logs";
 
 /* =========================
    SIDEBAR CONFIG
@@ -26,23 +29,6 @@ const NAV_ITEMS = [
 ];
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
-
-/* =========================
-   MOCK LOG DATA
-========================= */
-type LogEvent = {
-  timestamp: number;
-  entity: string;
-  endpoint: string;
-  decision: "ALLOW" | "CHALLENGE" | "BLOCK";
-  risk: number;
-};
-
-const MOCK_LOGS: LogEvent[] = [
-  { timestamp: Date.now() - 12_000, entity: "10.0.0.69", endpoint: "/login", decision: "BLOCK", risk: 58.88 },
-  { timestamp: Date.now() - 45_000, entity: "10.0.0.69", endpoint: "/login", decision: "CHALLENGE", risk: 30.0 },
-  { timestamp: Date.now() - 120_000, entity: "10.0.0.201", endpoint: "/login", decision: "ALLOW", risk: 0.0 },
-];
 
 /* =========================
    SPARKLINE
@@ -74,29 +60,46 @@ function Sparkline({ values }: { values: number[] }) {
    LOGS V2
 ========================= */
 export default function LogsV2() {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const [entityFilter, setEntityFilter] = useState("");
   const [decisionFilter, setDecisionFilter] =
-    useState<"ALL" | LogEvent["decision"]>("ALL");
+    useState<"ALL" | LogEntry["decision"]>("ALL");
   const [endpointFilter, setEndpointFilter] = useState("ALL");
 
+  useEffect(() => {
+    getLogsV2({ limit: 200 })
+      .then((res) => setLogs(res.results))
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load logs");
+      });
+  }, []);
+
   const endpoints = useMemo(
-    () => Array.from(new Set(MOCK_LOGS.map(l => l.endpoint))),
-    []
+    () => Array.from(new Set(logs.map((l) => l.endpoint))),
+    [logs]
   );
 
   const filteredLogs = useMemo(() => {
-    return MOCK_LOGS.filter(l => {
+    return logs.filter((l) => {
       if (entityFilter && !l.entity.includes(entityFilter)) return false;
-      if (decisionFilter !== "ALL" && l.decision !== decisionFilter) return false;
-      if (endpointFilter !== "ALL" && l.endpoint !== endpointFilter) return false;
+      if (decisionFilter !== "ALL" && l.decision !== decisionFilter)
+        return false;
+      if (endpointFilter !== "ALL" && l.endpoint !== endpointFilter)
+        return false;
       return true;
     });
-  }, [entityFilter, decisionFilter, endpointFilter]);
+  }, [logs, entityFilter, decisionFilter, endpointFilter]);
 
   const toggleExpand = (key: string) =>
-    setExpandedKey(prev => (prev === key ? null : key));
+    setExpandedKey((prev) => (prev === key ? null : key));
+
+  if (error) {
+    return <div className="auth-v2-root">{error}</div>;
+  }
 
   return (
     <div className="auth-v2-root">
@@ -113,7 +116,7 @@ export default function LogsV2() {
               <span className="health-dot" />
               SYSTEM: {SYSTEM_STATUS.toUpperCase()}
             </span>
-            <span className="auth-pill">RISK: LOW</span>
+            <span className="auth-pill">LIVE DATA</span>
           </div>
         </div>
 
@@ -127,14 +130,16 @@ export default function LogsV2() {
             className="h-10 w-56 px-4 rounded-md bg-neutral-900 border border-neutral-700 text-sm font-medium text-neutral-200 focus:outline-none"
             placeholder="Filter entity"
             value={entityFilter}
-            onChange={e => setEntityFilter(e.target.value)}
+            onChange={(e) => setEntityFilter(e.target.value)}
           />
 
           <div className="relative">
             <select
               className="h-10 w-44 px-4 pr-10 rounded-md bg-neutral-900 border border-neutral-700 text-sm font-medium text-neutral-200 appearance-none focus:outline-none"
               value={decisionFilter}
-              onChange={e => setDecisionFilter(e.target.value as any)}
+              onChange={(e) =>
+                setDecisionFilter(e.target.value as any)
+              }
             >
               <option value="ALL">All decisions</option>
               <option value="ALLOW">ALLOW</option>
@@ -150,11 +155,13 @@ export default function LogsV2() {
             <select
               className="h-10 w-44 px-4 pr-10 rounded-md bg-neutral-900 border border-neutral-700 text-sm font-medium text-neutral-200 appearance-none focus:outline-none"
               value={endpointFilter}
-              onChange={e => setEndpointFilter(e.target.value)}
+              onChange={(e) => setEndpointFilter(e.target.value)}
             >
               <option value="ALL">All endpoints</option>
-              {endpoints.map(ep => (
-                <option key={ep} value={ep}>{ep}</option>
+              {endpoints.map((ep) => (
+                <option key={ep} value={ep}>
+                  {ep}
+                </option>
               ))}
             </select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
@@ -168,18 +175,30 @@ export default function LogsV2() {
           <table className="w-full text-base font-semibold table-fixed">
             <thead className="sticky top-0 z-10 bg-neutral-900 text-neutral-300">
               <tr>
-                <th className="p-4 text-left w-[22%]">Timestamp</th>
-                <th className="p-4 text-left w-[18%]">Entity</th>
-                <th className="p-4 text-left w-[18%]">Endpoint</th>
-                <th className="p-4 text-left w-[14%]">Decision</th>
-                <th className="p-4 text-left w-[12%]">Risk</th>
-                <th className="p-4 text-left w-[16%]">Trend</th>
+                <th className="p-4 text-left w-[22%]">
+                  Timestamp
+                </th>
+                <th className="p-4 text-left w-[18%]">
+                  Entity
+                </th>
+                <th className="p-4 text-left w-[18%]">
+                  Endpoint
+                </th>
+                <th className="p-4 text-left w-[14%]">
+                  Decision
+                </th>
+                <th className="p-4 text-left w-[12%]">
+                  Risk
+                </th>
+                <th className="p-4 text-left w-[16%]">
+                  Trend
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {filteredLogs.map((log, i) => {
-                const key = `${log.timestamp}-${i}`;
+                const key = `${log.ts}-${i}`;
                 const expanded = expandedKey === key;
 
                 const severityColor =
@@ -200,16 +219,23 @@ export default function LogsV2() {
                         <span
                           className={`absolute left-0 top-2 bottom-2 w-1.5 rounded-full ${severityColor}`}
                         />
-                        {new Date(log.timestamp).toLocaleString()}
+                        {new Date(
+                          log.ts * 1000
+                        ).toLocaleString()}
                       </td>
-                      <td className="p-4 font-mono">{log.entity}</td>
-                      <td className="p-4">{log.endpoint}</td>
+                      <td className="p-4 font-mono">
+                        {log.entity}
+                      </td>
+                      <td className="p-4">
+                        {log.endpoint}
+                      </td>
                       <td className="p-4">
                         <span
                           className={
                             log.decision === "BLOCK"
                               ? "text-red-400"
-                              : log.decision === "CHALLENGE"
+                              : log.decision ===
+                                "CHALLENGE"
                               ? "text-yellow-400"
                               : "text-green-400"
                           }
@@ -217,38 +243,74 @@ export default function LogsV2() {
                           {log.decision}
                         </span>
                       </td>
-                      <td className="p-4 font-mono">{log.risk.toFixed(2)}</td>
+                      <td className="p-4 font-mono">
+                        {log.risk.toFixed(2)}
+                      </td>
                       <td className="p-4">
-                        <Sparkline values={[5, 12, 30, log.risk]} />
+                        <Sparkline
+                          values={[
+                            5,
+                            12,
+                            30,
+                            log.risk,
+                          ]}
+                        />
                       </td>
                     </tr>
 
                     {expanded && (
                       <tr className="bg-neutral-950 border-t border-neutral-800">
-                        <td colSpan={6} className="px-6 py-5 text-sm">
+                        <td
+                          colSpan={6}
+                          className="px-6 py-5 text-sm"
+                        >
                           <div className="grid grid-cols-3 gap-6 font-mono">
                             <div>
-                              <div className="text-xs uppercase text-neutral-500 mb-2">Request</div>
-                              <div>Entity: {log.entity}</div>
-                              <div>Endpoint: {log.endpoint}</div>
-                              <div>Time: {new Date(log.timestamp).toISOString()}</div>
+                              <div className="text-xs uppercase text-neutral-500 mb-2">
+                                Request
+                              </div>
+                              <div>
+                                Entity: {log.entity}
+                              </div>
+                              <div>
+                                Endpoint: {log.endpoint}
+                              </div>
+                              <div>
+                                Time:{" "}
+                                {new Date(
+                                  log.ts * 1000
+                                ).toISOString()}
+                              </div>
                             </div>
                             <div>
-                              <div className="text-xs uppercase text-neutral-500 mb-2">Decision</div>
-                              <div>Outcome: {log.decision}</div>
-                              <div>Risk Score: {log.risk.toFixed(2)}</div>
+                              <div className="text-xs uppercase text-neutral-500 mb-2">
+                                Decision
+                              </div>
+                              <div>
+                                Outcome: {log.decision}
+                              </div>
+                              <div>
+                                Risk Score:{" "}
+                                {log.risk.toFixed(2)}
+                              </div>
                             </div>
                             <div>
-                              <div className="text-xs uppercase text-neutral-500 mb-2">Enforcement</div>
+                              <div className="text-xs uppercase text-neutral-500 mb-2">
+                                Enforcement
+                              </div>
                               <div>
                                 Action:{" "}
-                                {log.decision === "BLOCK"
+                                {log.decision ===
+                                "BLOCK"
                                   ? "Traffic Blocked"
-                                  : log.decision === "CHALLENGE"
+                                  : log.decision ===
+                                    "CHALLENGE"
                                   ? "Additional Verification"
                                   : "Request Allowed"}
                               </div>
-                              <div>Policy: Adaptive Auth Guard</div>
+                              <div>
+                                Policy: Adaptive Auth Guard
+                              </div>
                             </div>
                           </div>
                         </td>

@@ -4,17 +4,12 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-# ==========================
-# FIXED IMPORT (Docker-safe)
-# ==========================
 from detection.event_processor import EventProcessor
 
 router = APIRouter(tags=["logs"])
 
-# Single shared processor instance (stateful by design)
 event_processor = EventProcessor()
 
-# Path to SQLite database
 DB_PATH = Path(__file__).resolve().parents[1] / "storage" / "authguard.db"
 
 
@@ -24,28 +19,29 @@ def get_conn():
     return conn
 
 
+def table_exists(cursor, table_name: str) -> bool:
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    )
+    return cursor.fetchone() is not None
+
+
 # -------------------------------------------------------------------
 # WRITE SIDE — Event Ingestion (UNCHANGED)
 # -------------------------------------------------------------------
 
 @router.post("/events/auth")
 def ingest_auth_event(raw_event: Dict[str, Any]):
-    """
-    Ingest an authentication event and return
-    decision + enforcement + explainability.
-    """
     try:
         result = event_processor.process(raw_event)
-        return {
-            "status": "processed",
-            "result": result
-        }
+        return {"status": "processed", "result": result}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 # -------------------------------------------------------------------
-# READ SIDE — Logs & Visibility (FIXED)
+# READ SIDE — Logs (V2 SAFE)
 # -------------------------------------------------------------------
 
 @router.get("/logs")
@@ -54,10 +50,16 @@ def get_logs(
     decision: Optional[str] = None,
     entity: Optional[str] = None,
 ):
-    """
-    Read persisted auth logs with optional filters.
-    Defensive against future timestamps.
-    """
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    # 🔒 EMPTY DB SAFETY
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return {
+            "count": 0,
+            "results": [],
+        }
 
     now_ms = int(datetime.utcnow().timestamp() * 1000)
 
@@ -80,8 +82,8 @@ def get_logs(
     filters = []
 
     if decision:
-        filters.append("decision = ?")
-        params.append(decision)
+        filters.append("UPPER(decision) = ?")
+        params.append(decision.upper())
 
     if entity:
         filters.append("entity = ?")
@@ -93,35 +95,28 @@ def get_logs(
     query += " ORDER BY ts DESC LIMIT ?"
     params.append(limit)
 
-    conn = get_conn()
-    rows = conn.execute(query, params).fetchall()
+    rows = cursor.execute(query, params).fetchall()
     conn.close()
 
-    results: List[Dict[str, Any]] = []
-
-    for row in rows:
-        results.append(
-            {
-                "timestamp": row["ts"],
-                "entity": row["entity"],
-                "endpoint": row["endpoint"],
-                "outcome": row["outcome"],
-                "decision": row["decision"],
-                "risk": row["risk"],
-                "enforcement_allowed": bool(row["enforcement_allowed"]),
-                "enforcement_reason": row["enforcement_reason"],
-            }
-        )
+    results = [
+        {
+            "ts": int(row["ts"] / 1000),
+            "entity": row["entity"],
+            "endpoint": row["endpoint"],
+            "outcome": row["outcome"],
+            "decision": row["decision"].upper(),
+            "risk": row["risk"],
+            "enforcement_allowed": bool(row["enforcement_allowed"]),
+            "enforcement_reason": row["enforcement_reason"],
+        }
+        for row in rows
+    ]
 
     return {
         "count": len(results),
         "results": results,
     }
 
-
-# -------------------------------------------------------------------
-# FIX: SUPPORT /logs/ (trailing slash)
-# -------------------------------------------------------------------
 
 @router.get("/logs/")
 def get_logs_alias(
