@@ -671,3 +671,278 @@
 .auth-icon-rail-items {
   margin-top: 96px;
 }
+
+/* ======================================================
+   PHASE 4 — DASHBOARD VISUAL CONTRACTS (FINAL)
+   Additions ONLY. No existing styles modified.
+====================================================== */
+
+/* =========================
+   RECENT THREATS (READ-ONLY)
+========================= */
+
+.auth-threat-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.threat-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.85;
+  cursor: default;
+}
+
+.threat-row:hover {
+  opacity: 1;
+}
+
+.threat-col,
+.threat-row span {
+  white-space: nowrap;
+}
+
+.threat-row.low .threat-risk {
+  color: #22c55e;
+}
+
+.threat-row.medium .threat-risk {
+  color: #f59e0b;
+}
+
+.threat-row.high .threat-risk {
+  color: #ef4444;
+}
+
+/* =========================
+   TOP ENTITIES (READ-ONLY)
+========================= */
+
+.top-entities {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entity-row {
+  font-size: 13px;
+  opacity: 0.85;
+  cursor: default;
+}
+
+.entity-row:hover {
+  opacity: 1;
+}
+
+.entity-row.low {
+  color: #22c55e;
+}
+
+.entity-row.medium {
+  color: #f59e0b;
+}
+
+.entity-row.high {
+  color: #ef4444;
+}
+
+/* =========================
+   RISK DISTRIBUTION — HORIZONTAL BARS
+========================= */
+
+.risk-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.risk-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.risk-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.risk-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.risk-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.risk-bar-fill.low {
+  background: #22c55e;
+}
+
+.risk-bar-fill.medium {
+  background: #f59e0b;
+}
+
+.risk-bar-fill.high {
+  background: #ef4444;
+}
+
+/* =========================
+   DECISION TIMELINE — TRUE TIMELINE
+========================= */
+
+.auth-timeline {
+  position: relative;
+  height: 40px;
+}
+
+.timeline-point {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.timeline-point.allow {
+  background: #107033;
+}
+
+.timeline-point.challenge {
+  background: #f59e0b;
+}
+
+.timeline-point.block {
+  background: #ef4444;
+}
+
+/* ======================================================
+   PHASE 4 — FINAL UI POLISH (TIMELINE + TEXT SCALE)
+====================================================== */
+
+/* Multi-lane decision timeline */
+.auth-timeline-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  align-items: center;
+  gap: 14px;
+}
+
+.timeline-label {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #9ca3af;
+}
+
+.timeline-track {
+  position: relative;
+  height: 18px;
+}
+
+.timeline-point {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.timeline-row.low .timeline-point {
+  background: #22c55e;
+}
+
+.timeline-row.medium .timeline-point {
+  background: #f59e0b;
+}
+
+.timeline-row.high .timeline-point {
+  background: #ef4444;
+}
+
+/* Recent Threats header */
+.threat-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #9ca3af;
+  margin-bottom: 10px;
+}
+
+/* Increase readability in lower cards */
+.auth-card-elevated {
+  font-size: 15px;
+}
+
+/* ======================================================
+   RECENT THREATS — MINI BOX STYLE (FINAL)
+====================================================== */
+
+.recent-threats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recent-threat-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #0b0b0b;
+  border: 1px solid #1f1f1f;
+  font-size: 14px;
+  cursor: default;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.recent-threat-item:hover {
+  background: #121212;
+  border-color: #2a2a2a;
+}
+
+.rt-entity {
+  color: #e5e7eb;
+}
+
+.rt-decision {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.rt-risk {
+  font-weight: 700;
+}
+
+/* Risk coloring */
+.recent-threat-item.low .rt-risk {
+  color: #22c55e;
+}
+
+.recent-threat-item.medium .rt-risk {
+  color: #f59e0b;
+}
+
+.recent-threat-item.high .rt-risk {
+  color: #ef4444;
+}

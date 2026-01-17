@@ -1,4 +1,3 @@
-
 import {
   ResponsiveContainer,
   AreaChart,
@@ -8,8 +7,8 @@ import {
   Tooltip,
 } from "recharts";
 
-type TimelineRow = {
-  hour: string;
+type TimelinePoint = {
+  time: string;
   ALLOW: number;
   CHALLENGE: number;
   BLOCK: number;
@@ -18,9 +17,9 @@ type TimelineRow = {
 export default function DecisionTimelineChart({
   data,
 }: {
-  data: TimelineRow[];
+  data: TimelinePoint[];
 }) {
-  if (data.length === 0) {
+  if (!data.length) {
     return (
       <div className="h-48 flex items-center justify-center text-neutral-500 italic">
         No timeline data
@@ -32,7 +31,7 @@ export default function DecisionTimelineChart({
     <div className="h-56">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
-          <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke="#666" />
+          <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#666" />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="#666" />
           <Tooltip
             contentStyle={{
@@ -45,26 +44,26 @@ export default function DecisionTimelineChart({
           <Area
             type="monotone"
             dataKey="ALLOW"
-            stackId="1"
             stroke="#22c55e"
             fill="#22c55e"
-            fillOpacity={0.35}
+            fillOpacity={0.25}
+            isAnimationActive={false}
           />
           <Area
             type="monotone"
             dataKey="CHALLENGE"
-            stackId="1"
             stroke="#f59e0b"
             fill="#f59e0b"
-            fillOpacity={0.35}
+            fillOpacity={0.25}
+            isAnimationActive={false}
           />
           <Area
             type="monotone"
             dataKey="BLOCK"
-            stackId="1"
             stroke="#ef4444"
             fill="#ef4444"
-            fillOpacity={0.4}
+            fillOpacity={0.3}
+            isAnimationActive={false}
           />
         </AreaChart>
       </ResponsiveContainer>

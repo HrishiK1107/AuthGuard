@@ -22,6 +22,16 @@ def table_exists(cursor, table_name: str) -> bool:
     return cursor.fetchone() is not None
 
 
+def risk_bucket(risk):
+    if risk is None:
+        return "LOW"
+    if risk < 30:
+        return "LOW"
+    if risk < 60:
+        return "MEDIUM"
+    return "HIGH"
+
+
 # =========================================================
 # DASHBOARD SUMMARY (V2 – CANONICAL)
 # =========================================================
@@ -47,15 +57,9 @@ def dashboard_summary():
             "timeline": [],
         }
 
-    # -------------------------
-    # Total events
-    # -------------------------
     cursor.execute("SELECT COUNT(*) FROM event_log")
     total_events = cursor.fetchone()[0]
 
-    # -------------------------
-    # Decision breakdown (NORMALIZED)
-    # -------------------------
     cursor.execute(
         "SELECT UPPER(decision) AS decision, COUNT(*) AS cnt "
         "FROM event_log GROUP BY decision"
@@ -71,9 +75,6 @@ def dashboard_summary():
         if row["decision"] in decision_breakdown:
             decision_breakdown[row["decision"]] = row["cnt"]
 
-    # -------------------------
-    # Top entities
-    # -------------------------
     cursor.execute(
         """
         SELECT entity, COUNT(*) AS cnt
@@ -89,9 +90,6 @@ def dashboard_summary():
         for row in cursor.fetchall()
     ]
 
-    # -------------------------
-    # Timeline (LAST 24h, UNIX SECONDS)
-    # -------------------------
     now_sec = int(datetime.utcnow().timestamp())
     last_24h_sec = now_sec - (24 * 60 * 60)
 
@@ -378,3 +376,157 @@ def system_health():
             "status": "degraded",
             "error": str(e),
         }
+
+
+# =========================================================
+# PHASE 4 – DASHBOARD LIVE ENDPOINTS (ADDED)
+# =========================================================
+@router.get("/recent-threats")
+def recent_threats():
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    last_24h_ms = now_ms - (24 * 60 * 60 * 1000)
+
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return []
+
+    cursor.execute(
+        """
+        SELECT entity, decision, risk, ts
+        FROM event_log
+        WHERE decision != 'ALLOW'
+          AND ts IS NOT NULL
+          AND ts >= ?
+        ORDER BY ts DESC
+        LIMIT 50
+        """,
+        (last_24h_ms,),
+    )
+
+    data = [
+        {
+            "entity": row["entity"],
+            "decision": row["decision"],
+            "risk": risk_bucket(row["risk"]),
+            "ts": row["ts"],
+        }
+        for row in cursor.fetchall()
+    ]
+
+    conn.close()
+    return data
+
+
+@router.get("/top-entities")
+def top_entities_v4():
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    last_24h_ms = now_ms - (24 * 60 * 60 * 1000)
+
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return []
+
+    cursor.execute(
+        """
+        SELECT entity, COUNT(*) AS cnt, MAX(risk) AS max_risk
+        FROM event_log
+        WHERE ts IS NOT NULL
+          AND ts >= ?
+        GROUP BY entity
+        ORDER BY cnt DESC
+        LIMIT 3
+        """,
+        (last_24h_ms,),
+    )
+
+    data = [
+        {
+            "entity": row["entity"],
+            "count": row["cnt"],
+            "risk": risk_bucket(row["max_risk"]),
+        }
+        for row in cursor.fetchall()
+    ]
+
+    conn.close()
+    return data
+
+
+@router.get("/risk-distribution-v4")
+def risk_distribution_v4():
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    last_24h_ms = now_ms - (24 * 60 * 60 * 1000)
+
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return {"low": 0, "medium": 0, "high": 0}
+
+    cursor.execute(
+        """
+        SELECT
+            CASE
+                WHEN risk < 30 THEN 'low'
+                WHEN risk < 60 THEN 'medium'
+                ELSE 'high'
+            END as bucket,
+            COUNT(*) as cnt
+        FROM event_log
+        WHERE ts IS NOT NULL
+          AND ts >= ?
+        GROUP BY bucket
+        """,
+        (last_24h_ms,),
+    )
+
+    dist = {"low": 0, "medium": 0, "high": 0}
+    for row in cursor.fetchall():
+        dist[row["bucket"]] = row["cnt"]
+
+    conn.close()
+    return dist
+
+
+@router.get("/decision-timeline")
+def decision_timeline_v4():
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+    last_24h_ms = now_ms - (24 * 60 * 60 * 1000)
+
+    if not table_exists(cursor, "event_log"):
+        conn.close()
+        return []
+
+    cursor.execute(
+        """
+        SELECT ts, entity, decision, risk
+        FROM event_log
+        WHERE ts IS NOT NULL
+          AND ts >= ?
+        ORDER BY ts ASC
+        """,
+        (last_24h_ms,),
+    )
+
+    data = [
+        {
+            "ts": row["ts"],
+            "entity": row["entity"],
+            "decision": row["decision"],
+            "risk": risk_bucket(row["risk"]),
+        }
+        for row in cursor.fetchall()
+    ]
+
+    conn.close()
+    return data
