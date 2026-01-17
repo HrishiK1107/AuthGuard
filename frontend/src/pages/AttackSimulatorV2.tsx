@@ -1,6 +1,11 @@
 // frontend/pages/AttackSimulatorV2.tsx
 
 import { useState } from "react";
+import {
+  simulateBruteforce,
+  simulateCredentialStuffing,
+  simulateOtpBombing,
+} from "../services/simulator";
 
 /* =========================
    TYPES
@@ -18,8 +23,9 @@ export default function AttackSimulatorV2() {
     useState<SimulatorType>("BRUTE_FORCE");
   const [acknowledged, setAcknowledged] = useState(false);
   const [runState, setRunState] = useState<RunState>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  /* --- shared fields --- */
+  /* --- shared fields (UI only, backend uses defaults for now) --- */
   const [username, setUsername] = useState("admin");
   const [ip, setIp] = useState("10.0.0.200");
   const [attempts, setAttempts] = useState(10);
@@ -39,11 +45,28 @@ export default function AttackSimulatorV2() {
     delay > 0 &&
     runState !== "running";
 
-  const runSimulation = () => {
+  /* =========================
+     REAL EXECUTION
+  ========================= */
+  const runSimulation = async () => {
     setRunState("running");
-    setTimeout(() => {
+    setErrorMsg(null);
+
+    try {
+      if (simulator === "BRUTE_FORCE") {
+        await simulateBruteforce();
+      } else if (simulator === "CREDENTIAL_STUFFING") {
+        await simulateCredentialStuffing();
+      } else if (simulator === "OTP_BOMBING") {
+        await simulateOtpBombing();
+      }
+
       setRunState("done");
-    }, 1200);
+    } catch (err) {
+      console.error(err);
+      setRunState("error");
+      setErrorMsg("Failed to trigger simulation");
+    }
   };
 
   return (
@@ -201,6 +224,13 @@ export default function AttackSimulatorV2() {
               I understand this will generate simulated attack traffic.
             </label>
 
+            {/* ERROR */}
+            {runState === "error" && errorMsg && (
+              <div className="mt-4 text-sm text-red-400">
+                {errorMsg}
+              </div>
+            )}
+
             {/* RUN */}
             <div className="mt-6">
               <button
@@ -211,6 +241,8 @@ export default function AttackSimulatorV2() {
                     ? "bg-yellow-600"
                     : runState === "done"
                     ? "bg-green-600"
+                    : runState === "error"
+                    ? "bg-red-700"
                     : "bg-red-600 hover:bg-red-500"
                 } disabled:opacity-40`}
               >
