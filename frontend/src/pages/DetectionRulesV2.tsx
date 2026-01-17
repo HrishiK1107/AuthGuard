@@ -1,6 +1,4 @@
-// frontend/pages/DetectionRulesV2.tsx
-
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -10,8 +8,10 @@ import {
   Bug,
   HeartPulse,
   Shield,
-  ChevronLeft,
 } from "lucide-react";
+
+import { getDetectionRulesV2 } from "../services/rules";
+import type { DetectionRule as ApiRule } from "../services/rules";
 
 /* =========================
    SIDEBAR CONFIG
@@ -30,77 +30,18 @@ const NAV_ITEMS = [
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
 /* =========================
-   MOCK RULE DATA
+   UI HELPERS
 ========================= */
-type RuleStatus = "QUIET" | "NOISY" | "ACTIVE";
 
-type DetectionRule = {
-  name: string;
-  entity: string;
-  threshold: number;
-  confidence: number;
-  decay: string;
-  window: string;
-  triggers: number;
-  lastTriggered?: number;
-  status: RuleStatus;
-  version: string;
-  loaded: boolean;
-};
-
-const MOCK_RULES: DetectionRule[] = [
-  {
-    name: "failed_login_velocity",
-    entity: "username",
-    threshold: 6,
-    confidence: 0.82,
-    decay: "linear",
-    window: "5m",
-    triggers: 18,
-    lastTriggered: Date.now() - 92_000,
-    status: "ACTIVE",
-    version: "v2.1",
-    loaded: true,
-  },
-  {
-    name: "ip_fan_out",
-    entity: "ip",
-    threshold: 12,
-    confidence: 0.64,
-    decay: "exp",
-    window: "10m",
-    triggers: 4,
-    lastTriggered: Date.now() - 420_000,
-    status: "NOISY",
-    version: "v2.0",
-    loaded: true,
-  },
-  {
-    name: "user_fan_in",
-    entity: "account",
-    threshold: 8,
-    confidence: 0.91,
-    decay: "linear",
-    window: "15m",
-    triggers: 0,
-    status: "QUIET",
-    version: "v1.9",
-    loaded: false,
-  },
-];
-
-/* =========================
-   HELPERS
-========================= */
-function formatTs(ts?: number) {
+function formatTs(ts: number | null) {
   if (!ts) return "—";
-  return new Date(ts).toLocaleString();
+  return new Date(ts * 1000).toLocaleString();
 }
 
-function statusPill(status: RuleStatus) {
-  if (status === "ACTIVE")
+function statusPill(status: string) {
+  if (status === "active")
     return "bg-red-900/40 text-red-400 border border-red-700";
-  if (status === "NOISY")
+  if (status === "noisy")
     return "bg-yellow-900/40 text-yellow-400 border border-yellow-700";
   return "bg-green-900/40 text-green-400 border border-green-700";
 }
@@ -115,7 +56,21 @@ function loadedPill(loaded: boolean) {
    DETECTION RULES V2
 ========================= */
 export default function DetectionRulesV2() {
-  const rules = useMemo(() => MOCK_RULES, []);
+  const [rules, setRules] = useState<ApiRule[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getDetectionRulesV2()
+      .then((res) => setRules(res.rules))
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load detection rules");
+      });
+  }, []);
+
+  if (error) {
+    return <div className="auth-v2-root">{error}</div>;
+  }
 
   return (
     <div className="auth-v2-root">
@@ -133,7 +88,7 @@ export default function DetectionRulesV2() {
               <span className="health-dot" />
               SYSTEM: {SYSTEM_STATUS.toUpperCase()}
             </span>
-            <span className="auth-pill">RISK: LOW</span>
+            <span className="auth-pill">LIVE DATA</span>
           </div>
         </div>
 
@@ -181,9 +136,9 @@ export default function DetectionRulesV2() {
                     </td>
                     <td className="px-4 py-[18px]">{r.decay}</td>
                     <td className="px-4 py-[18px]">{r.window}</td>
-                    <td className="px-4 py-[18px]">{r.triggers}</td>
+                    <td className="px-4 py-[18px]">{r.trigger_count}</td>
                     <td className="px-4 py-[18px]">
-                      {formatTs(r.lastTriggered)}
+                      {formatTs(r.last_triggered)}
                     </td>
                     <td className="px-4 py-[18px]">
                       <span
@@ -191,7 +146,7 @@ export default function DetectionRulesV2() {
                           r.status
                         )}`}
                       >
-                        {r.status}
+                        {r.status.toUpperCase()}
                       </span>
                     </td>
                     <td className="px-4 py-[18px] font-mono text-xs">
