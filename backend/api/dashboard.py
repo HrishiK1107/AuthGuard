@@ -23,13 +23,13 @@ def table_exists(cursor, table_name: str) -> bool:
 
 
 # =========================================================
-# DASHBOARD SUMMARY (CANONICAL)
+# DASHBOARD SUMMARY (V2 – CANONICAL)
 # =========================================================
 @router.get("/")
 def dashboard_summary():
     """
-    Canonical dashboard summary endpoint.
-    Used by dashboard cards.
+    Canonical dashboard summary endpoint (DashboardV2).
+    Used by dashboard cards + timeline.
     """
     conn = get_conn()
     cursor = conn.cursor()
@@ -38,33 +38,94 @@ def dashboard_summary():
         conn.close()
         return {
             "total_events": 0,
-            "decision_breakdown": {},
+            "decision_breakdown": {
+                "ALLOW": 0,
+                "CHALLENGE": 0,
+                "BLOCK": 0,
+            },
             "top_entities": [],
+            "timeline": [],
         }
 
+    # -------------------------
+    # Total events
+    # -------------------------
     cursor.execute("SELECT COUNT(*) FROM event_log")
     total_events = cursor.fetchone()[0]
 
+    # -------------------------
+    # Decision breakdown (NORMALIZED)
+    # -------------------------
     cursor.execute(
-        "SELECT decision, COUNT(*) as cnt FROM event_log GROUP BY decision"
+        "SELECT UPPER(decision) AS decision, COUNT(*) AS cnt "
+        "FROM event_log GROUP BY decision"
     )
+
     decision_breakdown = {
-        row["decision"]: row["cnt"] for row in cursor.fetchall()
+        "ALLOW": 0,
+        "CHALLENGE": 0,
+        "BLOCK": 0,
     }
 
+    for row in cursor.fetchall():
+        if row["decision"] in decision_breakdown:
+            decision_breakdown[row["decision"]] = row["cnt"]
+
+    # -------------------------
+    # Top entities
+    # -------------------------
     cursor.execute(
         """
-        SELECT entity, COUNT(*) as cnt
+        SELECT entity, COUNT(*) AS cnt
         FROM event_log
         GROUP BY entity
         ORDER BY cnt DESC
         LIMIT 5
         """
     )
+
     top_entities = [
         {"entity": row["entity"], "count": row["cnt"]}
         for row in cursor.fetchall()
     ]
+
+    # -------------------------
+    # Timeline (LAST 24h, UNIX SECONDS)
+    # -------------------------
+    now_sec = int(datetime.utcnow().timestamp())
+    last_24h_sec = now_sec - (24 * 60 * 60)
+
+    cursor.execute(
+        """
+        SELECT
+            (ts / 1000 / 3600) * 3600 AS bucket,
+            UPPER(decision) AS decision,
+            COUNT(*) AS cnt
+        FROM event_log
+        WHERE ts IS NOT NULL
+          AND (ts / 1000) >= ?
+        GROUP BY bucket, decision
+        ORDER BY bucket ASC
+        """,
+        (last_24h_sec,),
+    )
+
+    timeline_map = {}
+
+    for row in cursor.fetchall():
+        ts = int(row["bucket"])
+        if ts not in timeline_map:
+            timeline_map[ts] = {
+                "ts": ts,
+                "ALLOW": 0,
+                "CHALLENGE": 0,
+                "BLOCK": 0,
+            }
+
+        if row["decision"] in timeline_map[ts]:
+            timeline_map[ts][row["decision"]] = row["cnt"]
+
+    timeline = list(timeline_map.values())
 
     conn.close()
 
@@ -72,11 +133,12 @@ def dashboard_summary():
         "total_events": total_events,
         "decision_breakdown": decision_breakdown,
         "top_entities": top_entities,
+        "timeline": timeline,
     }
 
 
 # =========================================================
-# DASHBOARD METRICS
+# DASHBOARD METRICS (UNCHANGED)
 # =========================================================
 @router.get("/metrics")
 def dashboard_metrics():
@@ -107,9 +169,6 @@ def dashboard_metrics():
             "generated_at": now_ms,
         }
 
-    # -------------------------
-    # Throughput
-    # -------------------------
     cursor.execute("SELECT COUNT(*) FROM event_log")
     total_requests = cursor.fetchone()[0]
 
@@ -124,9 +183,6 @@ def dashboard_metrics():
     )
     last_24h = cursor.fetchone()[0]
 
-    # -------------------------
-    # Mitigation rate
-    # -------------------------
     cursor.execute(
         "SELECT COUNT(*) FROM event_log WHERE decision = 'BLOCK'"
     )
@@ -138,9 +194,6 @@ def dashboard_metrics():
         else 0.0
     )
 
-    # -------------------------
-    # Timeline
-    # -------------------------
     cursor.execute(
         """
         SELECT
@@ -171,9 +224,6 @@ def dashboard_metrics():
 
     timeline = list(timeline_map.values())
 
-    # -------------------------
-    # Risk distribution
-    # -------------------------
     cursor.execute(
         """
         SELECT
@@ -196,9 +246,6 @@ def dashboard_metrics():
     for row in cursor.fetchall():
         risk_distribution[row["bucket"]] = row["cnt"]
 
-    # -------------------------
-    # Risk drift
-    # -------------------------
     cursor.execute(
         """
         SELECT AVG(risk) FROM event_log
@@ -215,9 +262,6 @@ def dashboard_metrics():
 
     risk_drift = round(avg_risk_all - avg_risk_24h, 2)
 
-    # -------------------------
-    # Top risky entities
-    # -------------------------
     cursor.execute(
         """
         SELECT entity, MAX(risk) as max_risk
@@ -236,9 +280,6 @@ def dashboard_metrics():
         for row in cursor.fetchall()
     ]
 
-    # -------------------------
-    # Threat feed
-    # -------------------------
     cursor.execute(
         """
         SELECT entity, decision, risk, endpoint, ts
@@ -287,7 +328,7 @@ def dashboard_metrics():
 
 
 # =========================================================
-# SYSTEM HEALTH (CANONICAL)
+# SYSTEM HEALTH (UNCHANGED)
 # =========================================================
 @router.get("/health")
 def system_health():

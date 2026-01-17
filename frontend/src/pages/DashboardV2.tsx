@@ -1,17 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getDashboardV2 } from "../services/dashboard";
+import type { DashboardSummary } from "../services/dashboard";
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
 /* =========================
-   OPERATOR STATE (SIMULATED)
+   OPERATOR STATE (TEMP)
+   (Will be wired later)
 ========================= */
-const ACTIVE_BLOCKS = 3; // > 0 => blink
+const ACTIVE_BLOCKS = 3; // placeholder
 const DEFENSE_MODE: "MONITOR" | "ACTIVE" | "BLOCKING" = "MONITOR";
 
 export default function DashboardV2() {
+  const [data, setData] = useState<DashboardSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getDashboardV2()
+      .then(setData)
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load dashboard data");
+      });
+  }, []);
+
   const handleCardClick = (target: string) => {
     console.log(`[INTENT] Navigate to ${target}`);
   };
+
+  if (error) {
+    return <div className="auth-v2-root">{error}</div>;
+  }
+
+  if (!data) {
+    return <div className="auth-v2-root">Loading dashboard…</div>;
+  }
+
+  const blockedEvents = data.decision_breakdown.BLOCK ?? 0;
 
   return (
     <div className="auth-v2-root">
@@ -31,8 +56,8 @@ export default function DashboardV2() {
               SYSTEM: {SYSTEM_STATUS.toUpperCase()}
             </span>
 
-            <span className="auth-pill">LAST UPDATED: 17s ago</span>
-            <span className="auth-pill">RISK: LOW / HIGH</span>
+            <span className="auth-pill">LIVE DATA</span>
+            <span className="auth-pill">RISK: VARIABLE</span>
           </div>
         </div>
 
@@ -48,7 +73,9 @@ export default function DashboardV2() {
             onClick={() => handleCardClick("events")}
           >
             <div className="auth-card-title">Total Events</div>
-            <div className="auth-card-value">238</div>
+            <div className="auth-card-value">
+              {data.total_events}
+            </div>
             <div className="auth-sparkline">
               <span style={{ height: "40%" }} />
               <span style={{ height: "55%" }} />
@@ -65,7 +92,9 @@ export default function DashboardV2() {
             onClick={() => handleCardClick("blocked-events")}
           >
             <div className="auth-card-title">Blocked Events</div>
-            <div className="auth-card-value critical">64</div>
+            <div className="auth-card-value critical">
+              {blockedEvents}
+            </div>
             <div className="auth-sparkline">
               <span style={{ height: "30%" }} />
               <span style={{ height: "45%" }} />
@@ -104,7 +133,7 @@ export default function DashboardV2() {
             onClick={() => handleCardClick("mitigation")}
           >
             <div className="auth-card-title">Mitigation Rate</div>
-            <div className="auth-card-value warn">26.89%</div>
+            <div className="auth-card-value warn">—</div>
             <div className="auth-sparkline accent">
               <span style={{ height: "20%" }} />
               <span style={{ height: "35%" }} />
@@ -114,7 +143,7 @@ export default function DashboardV2() {
             </div>
           </div>
 
-          {/* DEFENSE MODE — AUTO COLOR */}
+          {/* DEFENSE MODE */}
           <div
             className={`auth-card defense-${DEFENSE_MODE.toLowerCase()}`}
             tabIndex={0}
@@ -135,40 +164,52 @@ export default function DashboardV2() {
           </div>
         </div>
 
-        {/* REST UNCHANGED */}
+        {/* TIMELINE + THREATS */}
         <div className="auth-v2-grid-2">
           <div className="auth-card-elevated">
             <div className="auth-card-title">Decision Timeline</div>
             <div className="auth-timeline">
-              <span className="allow" />
-              <span className="allow" />
-              <span className="challenge" />
-              <span className="block" />
-              <span className="block" />
-              <span className="allow" />
-              <span className="challenge" />
+              {data.timeline.map((row) => (
+                <span
+                  key={row.ts}
+                  className={
+                    row.BLOCK > 0
+                      ? "block"
+                      : row.CHALLENGE > 0
+                      ? "challenge"
+                      : "allow"
+                  }
+                />
+              ))}
             </div>
           </div>
 
           <div className="auth-card-elevated">
             <div className="auth-card-title">Recent Threats</div>
-            <div className="auth-placeholder">Threat feed placeholder</div>
+            <div className="auth-placeholder">
+              Wired in LogsV2
+            </div>
           </div>
         </div>
 
+        {/* RISK + ENTITIES */}
         <div className="auth-v2-grid-2">
           <div className="auth-card-elevated">
             <div className="auth-card-title">Risk Distribution</div>
-            <div className="auth-bars filled">
-              <div style={{ width: "25%" }} />
-              <div style={{ width: "45%" }} />
-              <div style={{ width: "70%" }} />
+            <div className="auth-placeholder">
+              Wired in metrics phase
             </div>
           </div>
 
           <div className="auth-card-elevated">
             <div className="auth-card-title">Top Entities</div>
-            <div className="auth-placeholder">Graph placeholder</div>
+            <div className="auth-placeholder">
+              {data.top_entities.map((e) => (
+                <div key={e.entity}>
+                  {e.entity} ({e.count})
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>

@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 type ApiError = {
   status: number;
@@ -18,7 +19,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 
   try {
     res = await fetch(`${API_BASE}${path}`);
-  } catch (err) {
+  } catch {
     // Network / CORS / backend down
     throw {
       status: 0,
