@@ -1,99 +1,128 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+from typing import List
 import time
 
 from simulator.brute_force import brute_force_attack
 from simulator.credential_stuffing import credential_stuffing_attack
 from simulator.otp_bombing import otp_bombing_attack
 
-
 router = APIRouter(prefix="/simulate", tags=["simulator"])
 
 
+# =========================================================
+# TIME ANCHOR
+# =========================================================
 def _now_ms() -> int:
-    """
-    Authoritative wall-clock time anchor.
-    Used to prevent simulator timestamp drift.
-    """
     return int(time.time() * 1000)
 
 
+# =========================================================
+# PAYLOAD MODELS
+# =========================================================
+class BruteforcePayload(BaseModel):
+    username: str = "admin"
+    ip: str = "127.0.0.1"
+    attempts: int = Field(6, gt=0)
+    delay: float = Field(0.2, gt=0)
+
+
+class CredentialStuffingPayload(BaseModel):
+    usernames: List[str] = ["alice", "bob", "charlie", "david"]
+    ip: str = "127.0.0.1"
+    delay: float = Field(0.3, gt=0)
+
+
+class OtpBombingPayload(BaseModel):
+    username: str = "Jane Doe"
+    ip: str = "127.0.0.1"
+    attempts: int = Field(8, gt=0)
+    delay: float = Field(0.4, gt=0)
+
+
+# =========================================================
+# BRUTE FORCE
+# =========================================================
 @router.post("/bruteforce")
-def simulate_bruteforce():
-    """
-    Simulate brute-force attack with time anchoring.
-    """
+def simulate_bruteforce(payload: BruteforcePayload):
     try:
         start_ts = _now_ms()
 
-        brute_force_attack(
-            username="admin",
-            ip_address="10.0.0.69",
-            attempts=6,
-            delay=0.2,
-            start_ts=start_ts,  # safe even if ignored
-        )
-    except TypeError:
-        # Backward compatibility if simulator doesn't accept start_ts
-        brute_force_attack(
-            username="admin",
-            ip_address="10.0.0.69",
-            attempts=6,
-            delay=0.2
-        )
+        try:
+            brute_force_attack(
+                username=payload.username,
+                ip_address=payload.ip,
+                attempts=payload.attempts,
+                delay=payload.delay,
+                start_ts=start_ts,
+            )
+        except TypeError:
+            # backward compatibility
+            brute_force_attack(
+                username=payload.username,
+                ip_address=payload.ip,
+                attempts=payload.attempts,
+                delay=payload.delay,
+            )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"status": "started", "type": "bruteforce"}
 
 
+# =========================================================
+# CREDENTIAL STUFFING
+# =========================================================
 @router.post("/credential-stuffing")
-def simulate_credential_stuffing():
-    """
-    Simulate credential stuffing with time anchoring.
-    """
+def simulate_credential_stuffing(payload: CredentialStuffingPayload):
     try:
         start_ts = _now_ms()
 
-        credential_stuffing_attack(
-            usernames=["alice", "bob", "charlie", "david"],
-            ip_address="10.0.0.202",
-            delay=0.3,
-            start_ts=start_ts,
-        )
-    except TypeError:
-        credential_stuffing_attack(
-            usernames=["alice", "bob", "charlie", "david"],
-            ip_address="10.0.0.202",
-            delay=0.3
-        )
+        try:
+            credential_stuffing_attack(
+                usernames=payload.usernames,
+                ip_address=payload.ip,
+                delay=payload.delay,
+                start_ts=start_ts,
+            )
+        except TypeError:
+            credential_stuffing_attack(
+                usernames=payload.usernames,
+                ip_address=payload.ip,
+                delay=payload.delay,
+            )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"status": "started", "type": "credential-stuffing"}
 
 
+# =========================================================
+# OTP BOMBING
+# =========================================================
 @router.post("/otp-bombing")
-def simulate_otp_bombing():
-    """
-    Simulate OTP bombing with time anchoring.
-    """
+def simulate_otp_bombing(payload: OtpBombingPayload):
     try:
         start_ts = _now_ms()
 
-        otp_bombing_attack(
-            username="Jane Doe",
-            ip_address="10.0.0.203",
-            attempts=8,
-            delay=0.4,
-            start_ts=start_ts,
-        )
-    except TypeError:
-        otp_bombing_attack(
-            username="Jane Doe",
-            ip_address="10.0.0.203",
-            attempts=8,
-            delay=0.4
-        )
+        try:
+            otp_bombing_attack(
+                username=payload.username,
+                ip_address=payload.ip,
+                attempts=payload.attempts,
+                delay=payload.delay,
+                start_ts=start_ts,
+            )
+        except TypeError:
+            otp_bombing_attack(
+                username=payload.username,
+                ip_address=payload.ip,
+                attempts=payload.attempts,
+                delay=payload.delay,
+            )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

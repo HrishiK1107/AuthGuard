@@ -1,6 +1,6 @@
 // frontend/pages/AttackSimulatorV2.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   simulateBruteforce,
   simulateCredentialStuffing,
@@ -25,24 +25,36 @@ export default function AttackSimulatorV2() {
   const [runState, setRunState] = useState<RunState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  /* --- shared fields (UI only, backend uses defaults for now) --- */
+  /* --- shared fields (UI only) --- */
   const [username, setUsername] = useState("admin");
   const [ip, setIp] = useState("10.0.0.200");
-  const [attempts, setAttempts] = useState(10);
-  const [delay, setDelay] = useState(0.5);
-  const [userCount, setUserCount] = useState(5);
+  const [attempts, setAttempts] = useState("10");
+  const [delay, setDelay] = useState("0.5");
+  const [userCount, setUserCount] = useState("5");
+
+  /* reset run state when simulator changes */
+  useEffect(() => {
+    setRunState("idle");
+    setErrorMsg(null);
+  }, [simulator]);
+
+  const parsedAttempts = Number(attempts);
+  const parsedDelay = Number(delay);
+  const parsedUserCount = Number(userCount);
 
   const estimatedDuration =
     simulator === "CREDENTIAL_STUFFING"
-      ? userCount * delay
-      : attempts * delay;
+      ? (parsedUserCount || 0) * (parsedDelay || 0)
+      : (parsedAttempts || 0) * (parsedDelay || 0);
 
   const canRun =
     acknowledged &&
     username &&
     ip &&
-    attempts > 0 &&
-    delay > 0 &&
+    parsedDelay > 0 &&
+    (simulator === "CREDENTIAL_STUFFING"
+      ? parsedUserCount > 0
+      : parsedAttempts > 0) &&
     runState !== "running";
 
   /* =========================
@@ -54,24 +66,50 @@ export default function AttackSimulatorV2() {
 
     try {
       if (simulator === "BRUTE_FORCE") {
-        await simulateBruteforce();
+        await simulateBruteforce({
+          username,
+          ip,
+          attempts: parsedAttempts,
+          delay: parsedDelay,
+        });
       } else if (simulator === "CREDENTIAL_STUFFING") {
-        await simulateCredentialStuffing();
+        await simulateCredentialStuffing({
+          usernames: Array.from(
+            { length: parsedUserCount },
+            (_, i) => `user${i + 1}`
+          ),
+          ip,
+          delay: parsedDelay,
+        });
       } else if (simulator === "OTP_BOMBING") {
-        await simulateOtpBombing();
+        await simulateOtpBombing({
+          username,
+          ip,
+          attempts: parsedAttempts,
+          delay: parsedDelay,
+        });
       }
 
       setRunState("done");
+
+      // auto-reset after success
+      setTimeout(() => {
+        setRunState("idle");
+      }, 2000);
     } catch (err) {
       console.error(err);
       setRunState("error");
       setErrorMsg("Failed to trigger simulation");
+
+      // auto-reset after error
+      setTimeout(() => {
+        setRunState("idle");
+      }, 2000);
     }
   };
 
   return (
     <div className="auth-v2-root">
-      {/* MAIN */}
       <main className="auth-v2-main">
         {/* TOP BAR */}
         <div className="auth-v2-topbar">
@@ -90,14 +128,12 @@ export default function AttackSimulatorV2() {
 
         <div className="logs-v2-divider" />
 
-        {/* TITLE */}
         <h1 className="logs-v2-title">ATTACK SIMULATOR</h1>
         <p className="text-sm text-neutral-400 mb-6 max-w-3xl">
           Trigger controlled authentication abuse patterns for testing
           detection, risk scoring, and enforcement behavior.
         </p>
 
-        {/* LAYOUT */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* ATTACK TYPE */}
           <div className="auth-card-elevated flex flex-col">
@@ -145,60 +181,85 @@ export default function AttackSimulatorV2() {
             </div>
           </div>
 
-          {/* CONFIG */}
+          {/* CONFIGURATION */}
           <div className="auth-card-elevated xl:col-span-2">
-            <div className="auth-card-title">Configuration</div>
+            <div className="auth-card-title mb-4">Configuration</div>
 
             <div className="grid grid-cols-2 gap-4">
-              <input
-                className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-              />
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  Target Username
+                </label>
+                <input
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
 
-              <input
-                className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
-                value={ip}
-                onChange={(e) => setIp(e.target.value)}
-                placeholder="Source IP"
-              />
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  Source IP
+                </label>
+                <input
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
+                  value={ip}
+                  onChange={(e) => setIp(e.target.value)}
+                />
+              </div>
 
               {simulator === "CREDENTIAL_STUFFING" ? (
-                <input
-                  type="number"
-                  className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
-                  value={userCount}
-                  onChange={(e) =>
-                    setUserCount(Number(e.target.value))
-                  }
-                  placeholder="User count"
-                />
+                <div>
+                  <label className="text-xs text-neutral-400 mb-1 block">
+                    User Count
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
+                    value={userCount}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d*$/.test(v)) setUserCount(v);
+                    }}
+                  />
+                </div>
               ) : (
-                <input
-                  type="number"
-                  className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
-                  value={attempts}
-                  onChange={(e) =>
-                    setAttempts(Number(e.target.value))
-                  }
-                  placeholder="Attempts"
-                />
+                <div>
+                  <label className="text-xs text-neutral-400 mb-1 block">
+                    Attempts
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
+                    value={attempts}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^\d*$/.test(v)) setAttempts(v);
+                    }}
+                  />
+                </div>
               )}
 
-              <input
-                type="number"
-                step="0.1"
-                className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
-                value={delay}
-                onChange={(e) =>
-                  setDelay(Number(e.target.value))
-                }
-                placeholder="Delay (sec)"
-              />
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  Delay (seconds)
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm"
+                  value={delay}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (/^\d*\.?\d*$/.test(v)) setDelay(v);
+                  }}
+                />
+              </div>
             </div>
 
-            {/* WARNINGS */}
+            {/* WARNING */}
             <div className="mt-6 border border-yellow-700 bg-yellow-900/20 rounded-lg p-4 text-sm text-yellow-400">
               ⚠ This will inject authentication events into the system.
               <br />
