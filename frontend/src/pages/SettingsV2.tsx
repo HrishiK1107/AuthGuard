@@ -1,24 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import StatusBadge from "../components/ui/StatusBadge";
 import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
 
+import {
+  getActiveBlocks,
+  getEnforcerHealth,
+  getEnforcementSettings,
+} from "../services/enforcement";
+
+import type {
+  ActiveBlock,
+  EnforcementMode,
+} from "../services/enforcement";
+
+
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
-
-/* =========================
-   TYPES
-========================= */
-type EnforcementMode = "fail-open" | "fail-closed";
-
-type ActiveBlock = {
-  id: string;
-  entity: string;
-  scope: string;
-  decision: "TEMP_BLOCK" | "HARD_BLOCK";
-  risk: number | null;
-  ttl_seconds: number;
-  source: "auto" | "manual";
-};
 
 /* =========================
    HELPERS
@@ -38,53 +35,41 @@ function blockBadge(decision: string) {
 /* =========================
    ENFORCEMENT CONTROL V2
 ========================= */
-export default function SettingsV2() {
-  /* =========================
-     UI-ONLY STATE (NO BACKEND)
-  ========================= */
+export default function EnforcementControlV2() {
   const [mode, setMode] = useState<EnforcementMode>("fail-closed");
-  const [enforcerUp] = useState(true);
+  const [blocks, setBlocks] = useState<ActiveBlock[]>([]);
+  const [enforcerUp, setEnforcerUp] = useState<boolean>(false);
 
-  const blocks: ActiveBlock[] = [
-    {
-      id: "1",
-      entity: "3.3.3.3",
-      scope: "auth",
-      decision: "HARD_BLOCK",
-      risk: 69.93,
-      ttl_seconds: 300,
-      source: "auto",
-    },
-    {
-      id: "2",
-      entity: "10.0.0.203",
-      scope: "auth",
-      decision: "HARD_BLOCK",
-      risk: null,
-      ttl_seconds: 300,
-      source: "manual",
-    },
-  ];
+  useEffect(() => {
+    async function load() {
+      try {
+        const [blocksRes, enforcer, settings] =
+          await Promise.all([
+            getActiveBlocks(),
+            getEnforcerHealth(),
+            getEnforcementSettings(),
+          ]);
+
+        setBlocks(blocksRes.blocks || []);
+        setEnforcerUp(enforcer.status === "up");
+        setMode(settings.mode);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    load();
+  }, []);
 
   const modeStatus = modeBadge(mode);
 
-  /* =========================
-     ACTIONS (UI ONLY)
-  ========================= */
-  const toggleMode = () => {
-    setMode((prev) =>
-      prev === "fail-open" ? "fail-closed" : "fail-open"
-    );
-  };
-
   return (
     <div className="auth-v2-root">
-      {/* MAIN */}
       <main className="auth-v2-main">
         {/* TOP BAR */}
         <div className="auth-v2-topbar">
           <div className="auth-v2-title">
-            Authentication Abuse Detection System
+            AUTHENTICATION ABUSE DETECTION SYSTEM
           </div>
 
           <div className="auth-v2-top-right">
@@ -93,7 +78,7 @@ export default function SettingsV2() {
               <span className="health-dot" />
               SYSTEM: {SYSTEM_STATUS.toUpperCase()}
             </span>
-            <span className="auth-pill">RISK: LOW</span>
+            <span className="auth-pill">LIVE DATA</span>
           </div>
         </div>
 
@@ -112,8 +97,8 @@ export default function SettingsV2() {
             <div className="flex items-center justify-between mt-1">
               <StatusBadge {...modeStatus} />
               <button
-                onClick={toggleMode}
-                className="text-xs px-3 py-1 rounded bg-neutral-800 hover:bg-neutral-700"
+                disabled
+                className="text-xs px-3 py-1 rounded bg-neutral-800 opacity-50 cursor-not-allowed"
               >
                 Toggle
               </button>
@@ -138,7 +123,9 @@ export default function SettingsV2() {
 
         {/* ACTIVE ENFORCEMENT */}
         <div className="auth-card-elevated mt-4">
-          <div className="auth-card-title mb-3">Active Enforcement</div>
+          <div className="auth-card-title mb-3">
+            Active Enforcement
+          </div>
 
           <Table
             headers={[
@@ -158,17 +145,29 @@ export default function SettingsV2() {
               />
             ) : (
               blocks.map((b) => (
-                <tr key={b.id} className="border-t border-neutral-800">
+                <tr
+                  key={b.id}
+                  className="border-t border-neutral-800"
+                >
                   <td className="px-3 py-2">{b.entity}</td>
                   <td className="px-3 py-2">{b.scope}</td>
                   <td className="px-3 py-2">
                     <StatusBadge {...blockBadge(b.decision)} />
                   </td>
-                  <td className="px-3 py-2">{b.risk ?? "—"}</td>
-                  <td className="px-3 py-2">{b.ttl_seconds}</td>
-                  <td className="px-3 py-2">{b.source}</td>
                   <td className="px-3 py-2">
-                    <button className="text-xs px-3 py-1 rounded bg-red-900 text-red-300 opacity-60 cursor-not-allowed">
+                    {b.risk ?? "—"}
+                  </td>
+                  <td className="px-3 py-2">
+                    {b.ttl_seconds}
+                  </td>
+                  <td className="px-3 py-2">
+                    {b.source}
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      disabled
+                      className="text-xs px-3 py-1 rounded bg-red-900 text-red-300 opacity-60 cursor-not-allowed"
+                    >
                       Unblock
                     </button>
                   </td>
