@@ -26,15 +26,14 @@ const NAV_ITEMS = [
 export default function IconRail() {
   return (
     <aside className="auth-icon-rail">
-
-      {/* TOP LOGO SLOT — replaces expand arrow */}
+      {/* TOP LOGO SLOT — emoji removed, structure intact */}
       <div className="auth-v2-nav-header flex items-center justify-center h-14">
         <NavLink
           to="/dashboard"
           title="AuthGuard — Dashboard"
           className="text-xl"
         >
-          🛡️
+          {/* intentionally empty */}
         </NavLink>
       </div>
 
