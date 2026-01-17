@@ -42,5 +42,38 @@
     "active": true,
     "source": "auto",
     "created_at": 1768468024144
+  },
+  {
+    "id": "manual::10.0.0.69",
+    "entity": "10.0.0.69",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": null,
+    "ttl_seconds": 300,
+    "active": false,
+    "source": "manual",
+    "created_at": 1768662403070
+  },
+  {
+    "id": "manual::10.0.0.69",
+    "entity": "10.0.0.69",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": null,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "manual",
+    "created_at": 1768662763554
+  },
+  {
+    "id": "manual::10.0.0.200",
+    "entity": "10.0.0.200",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": null,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "manual",
+    "created_at": 1768662773500
   }
 ]

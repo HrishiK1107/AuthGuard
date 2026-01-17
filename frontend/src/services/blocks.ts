@@ -1,4 +1,4 @@
-import { apiGet } from "./api";
+import { apiGet, apiPost } from "./api";
 
 /* =========================
    Active Blocks V2 Contract
@@ -7,12 +7,12 @@ import { apiGet } from "./api";
 export type ActiveBlock = {
   id: string;
   entity: string;
-  decision: string; // e.g. HARD_BLOCK
+  decision: string;
   risk: number | null;
   active: boolean;
   source: string;
-  created_ts: number | null; // unix seconds
-  expires_ts: number | null; // unix seconds
+  created_ts: number | null;
+  expires_ts: number | null;
 };
 
 export type ActiveBlocksResponse = {
@@ -26,4 +26,12 @@ export type ActiveBlocksResponse = {
 
 export function getActiveBlocksV2() {
   return apiGet<ActiveBlocksResponse>("/blocks");
+}
+
+export function manualBlock(entity: string) {
+  return apiPost("/blocks/block", { entity });
+}
+
+export function manualUnblock(entity: string) {
+  return apiPost("/blocks/unblock", { entity });
 }
