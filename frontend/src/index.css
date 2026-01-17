@@ -271,29 +271,32 @@
     CARDS (METRICS REDUCED ~20%)
   ========================= */
 
-  .auth-card {
-    background: #121212;
-    border-radius: 20px;
-    padding: 20px;
-    border: 1px solid #1f1f1f;
-    box-shadow: 0 24px 52px rgba(0,0,0,0.85);
-    position: relative;
-    cursor: pointer;
-    transition:
-      transform 0.15s ease,
-      border-color 0.15s ease,
-      box-shadow 0.15s ease;
-  }
+.auth-card {
+  background: #121212;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid #1f1f1f;
+  box-shadow: 0 24px 52px rgba(0,0,0,0.85);
+  position: relative;
+  cursor: pointer;
+  overflow: hidden; /* ← ADD THIS */
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
 
-  .auth-card-elevated {
-    background: #121212;
-    border-radius: 20px;
-    padding: 26px;
-    border: 1px solid #1f1f1f;
-    box-shadow: 0 28px 60px rgba(0,0,0,0.85);
-    position: relative;
-    cursor: pointer;
-  }
+.auth-card-elevated {
+  background: #121212;
+  border-radius: 20px;
+  padding: 26px;
+  border: 1px solid #1f1f1f;
+  box-shadow: 0 28px 60px rgba(0,0,0,0.85);
+  position: relative;
+  cursor: pointer;
+  overflow: hidden; /* ← ADD THIS */
+}
+
 
   .auth-card:hover,
   .auth-card-elevated:hover {
@@ -777,13 +780,17 @@
   height: 6px;
   background: rgba(255,255,255,0.08);
   border-radius: 999px;
-  overflow: hidden;
+  overflow: hidden;          /* ⬅️ IMPORTANT */
+  position: relative;
 }
+
 
 .risk-bar-fill {
   height: 100%;
   border-radius: 999px;
+  max-width: 100%;           /* ⬅️ ABSOLUTE CLAMP */
 }
+
 
 .risk-bar-fill.low {
   background: #22c55e;

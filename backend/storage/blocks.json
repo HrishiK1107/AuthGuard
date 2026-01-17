@@ -86,5 +86,27 @@
     "active": true,
     "source": "auto",
     "created_at": 1768669102594
+  },
+  {
+    "id": "auto::10.0.0.2",
+    "entity": "10.0.0.2",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": 69.80620492882898,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "auto",
+    "created_at": 1768675409049
+  },
+  {
+    "id": "auto::10.0.0.1",
+    "entity": "10.0.0.1",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": 69.95003222934167,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "auto",
+    "created_at": 1768680321945
   }
 ]
