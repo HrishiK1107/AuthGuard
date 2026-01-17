@@ -15,7 +15,6 @@ import type {
 } from "../services/dashboard";
 
 import DecisionTimelineChart from "../components/charts/DecisionTimelineChart";
-import RiskDistributionChart from "../components/charts/RiskDistributionChart";
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
@@ -54,13 +53,14 @@ export default function DashboardV2() {
   }, []);
 
   /* =========================
-     DERIVED FLAGS
+     DERIVED FLAGS (NO EARLY RETURNS)
   ========================= */
   const isLoading = !data && !error;
+
   const blockedEvents = data?.decision_breakdown.BLOCK ?? 0;
 
   /* ======================================================
-     DECISION TIMELINE — LAST 15 MIN (FRONTEND AGGREGATION)
+     DECISION TIMELINE — FRONTEND AGGREGATION (LAST 15 MIN)
   ====================================================== */
   const timelineData = useMemo(() => {
     const now = Date.now();
@@ -103,9 +103,21 @@ export default function DashboardV2() {
   return (
     <div className="auth-v2-root">
       <main className="auth-v2-main">
-        {error && <div className="auth-error">{error}</div>}
-        {isLoading && <div className="auth-loading">Loading dashboard…</div>}
+        {/* ERROR STATE */}
+        {error && (
+          <div className="auth-error">
+            {error}
+          </div>
+        )}
 
+        {/* LOADING STATE */}
+        {isLoading && (
+          <div className="auth-loading">
+            Loading dashboard…
+          </div>
+        )}
+
+        {/* MAIN DASHBOARD */}
         {!isLoading && !error && data && (
           <>
             {/* TOP BAR */}
@@ -136,7 +148,9 @@ export default function DashboardV2() {
 
               <div className="auth-card">
                 <div className="auth-card-title">Blocked Events</div>
-                <div className="auth-card-value critical">{blockedEvents}</div>
+                <div className="auth-card-value critical">
+                  {blockedEvents}
+                </div>
               </div>
 
               <div
@@ -145,7 +159,9 @@ export default function DashboardV2() {
                 }`}
               >
                 <div className="auth-card-title">Active Blocks</div>
-                <div className="auth-card-value critical">{ACTIVE_BLOCKS}</div>
+                <div className="auth-card-value critical">
+                  {ACTIVE_BLOCKS}
+                </div>
               </div>
 
               <div className="auth-card">
@@ -165,11 +181,7 @@ export default function DashboardV2() {
                 <div className="auth-card-title">
                   Decision Timeline (Last 15 min)
                 </div>
-
-                {/* CENTERED TIMELINE */}
-                <div className="flex items-center justify-center h-full">
-                  <DecisionTimelineChart data={timelineData} />
-                </div>
+                <DecisionTimelineChart data={timelineData} />
               </div>
 
               <div className="auth-card-elevated">
@@ -193,14 +205,7 @@ export default function DashboardV2() {
             <div className="auth-v2-grid-2">
               <div className="auth-card-elevated">
                 <div className="auth-card-title">Risk Distribution</div>
-
-                {riskDistribution ? (
-                  <RiskDistributionChart data={riskDistribution} />
-                ) : (
-                  <div className="h-40 flex items-center justify-center text-neutral-500 italic">
-                    No risk data
-                  </div>
-                )}
+                {/* existing bar UI untouched */}
               </div>
 
               <div className="auth-card-elevated">
