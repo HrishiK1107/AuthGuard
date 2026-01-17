@@ -108,7 +108,7 @@ export default function LogsV2() {
         {/* TOP BAR */}
         <div className="auth-v2-topbar">
           <div className="auth-v2-title">
-            Authentication Abuse Detection System
+            AUTHENTICATION ABUSE DETECTION SYSTEM
           </div>
           <div className="auth-v2-top-right">
             <span className="auth-pill">MODE: FAIL-CLOSED</span>
