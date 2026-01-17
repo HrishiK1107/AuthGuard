@@ -75,5 +75,16 @@
     "active": true,
     "source": "manual",
     "created_at": 1768662773500
+  },
+  {
+    "id": "auto::192.168.0.12",
+    "entity": "192.168.0.12",
+    "scope": "auth",
+    "decision": "HARD_BLOCK",
+    "risk": 69.95003220733463,
+    "ttl_seconds": 300,
+    "active": true,
+    "source": "auto",
+    "created_at": 1768669102594
   }
 ]

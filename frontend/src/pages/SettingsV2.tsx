@@ -9,11 +9,12 @@ import {
   getEnforcementSettings,
 } from "../services/enforcement";
 
+import { apiPost } from "../services/api";
+
 import type {
   ActiveBlock,
   EnforcementMode,
 } from "../services/enforcement";
-
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
@@ -36,9 +37,11 @@ function blockBadge(decision: string) {
    ENFORCEMENT CONTROL V2
 ========================= */
 export default function EnforcementControlV2() {
-  const [mode, setMode] = useState<EnforcementMode>("fail-closed");
+  const [mode, setMode] =
+    useState<EnforcementMode>("fail-closed");
   const [blocks, setBlocks] = useState<ActiveBlock[]>([]);
   const [enforcerUp, setEnforcerUp] = useState<boolean>(false);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -61,6 +64,29 @@ export default function EnforcementControlV2() {
     load();
   }, []);
 
+  /* =========================
+     TOGGLE MODE
+  ========================= */
+  const toggleMode = async () => {
+    if (toggling) return;
+
+    const nextMode: EnforcementMode =
+      mode === "fail-closed" ? "fail-open" : "fail-closed";
+
+    setToggling(true);
+    setMode(nextMode); // optimistic
+
+    try {
+      await apiPost("/settings/mode", { mode: nextMode });
+    } catch (e) {
+      console.error(e);
+      // rollback on failure
+      setMode(mode);
+    } finally {
+      setToggling(false);
+    }
+  };
+
   const modeStatus = modeBadge(mode);
 
   return (
@@ -73,7 +99,9 @@ export default function EnforcementControlV2() {
           </div>
 
           <div className="auth-v2-top-right">
-            <span className="auth-pill">MODE: FAIL-CLOSED</span>
+            <span className="auth-pill">
+              MODE: {mode.toUpperCase()}
+            </span>
             <span className={`auth-pill health ${SYSTEM_STATUS}`}>
               <span className="health-dot" />
               SYSTEM: {SYSTEM_STATUS.toUpperCase()}
@@ -97,8 +125,9 @@ export default function EnforcementControlV2() {
             <div className="flex items-center justify-between mt-1">
               <StatusBadge {...modeStatus} />
               <button
-                disabled
-                className="text-xs px-3 py-1 rounded bg-neutral-800 opacity-50 cursor-not-allowed"
+                onClick={toggleMode}
+                disabled={toggling}
+                className="text-xs px-3 py-1 rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50"
               >
                 Toggle
               </button>
