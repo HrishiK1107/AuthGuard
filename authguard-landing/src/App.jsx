@@ -11,7 +11,7 @@ export default function App() {
 }
 
 /* =========================
-   Landing Page (UI UNCHANGED)
+   Landing Page (LOCKED UI)
 ========================== */
 function Landing() {
   return (
@@ -118,8 +118,9 @@ function Landing() {
             Bottom: Actions
         ========================== */}
         <footer className="flex items-center gap-8">
+          {/* ✅ PRODUCTION-CORRECT LINK */}
           <a
-            href="http://localhost:5173/dashboard"
+            href="/dashboard"
             className="px-8 py-4 rounded-lg bg-emerald-600 text-black text-lg font-bold
                        hover:bg-emerald-500
                        hover:shadow-[0_0_35px_-8px_rgba(16,185,129,0.75)]
