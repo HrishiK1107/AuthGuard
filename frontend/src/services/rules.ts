@@ -1,4 +1,4 @@
-import { apiGet } from "./api";
+import { apiGet, apiPost } from "./api";
 
 /* =========================
    Detection Rules V2 Contract
@@ -27,5 +27,21 @@ export type RulesResponse = {
 ========================= */
 
 export function getDetectionRulesV2() {
-  return apiGet<RulesResponse>("/rules");
+  // @router.get("/")
+  return apiGet<RulesResponse>("/rules/");
+}
+
+export function enableRule(ruleName: string) {
+  // @router.post("/enable/{rule_name}")
+  return apiPost(`/rules/enable/${ruleName}`);
+}
+
+export function disableRule(ruleName: string) {
+  // @router.post("/disable/{rule_name}")
+  return apiPost(`/rules/disable/${ruleName}`);
+}
+
+export function updateRuleThreshold(ruleName: string, threshold: number) {
+  // @router.post("/threshold/{rule_name}")
+  return apiPost(`/rules/threshold/${ruleName}`, { threshold });
 }

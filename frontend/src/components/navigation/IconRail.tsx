@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
   { label: "Logs", icon: FileText, path: "/logs" },
   { label: "Campaigns", icon: Radar, path: "/campaigns" },
   { label: "Detection Rules", icon: ListChecks, path: "/rules" },
@@ -26,15 +26,13 @@ const NAV_ITEMS = [
 export default function IconRail() {
   return (
     <aside className="auth-icon-rail">
-      {/* TOP LOGO SLOT — emoji removed, structure intact */}
+      {/* TOP LOGO SLOT */}
       <div className="auth-v2-nav-header flex items-center justify-center h-14">
         <NavLink
-          to="/dashboard"
+          to="/"
           title="AuthGuard — Dashboard"
           className="text-xl"
-        >
-          {/* intentionally empty */}
-        </NavLink>
+        />
       </div>
 
       {/* ICONS */}
@@ -47,6 +45,7 @@ export default function IconRail() {
             className={({ isActive }) =>
               `auth-v2-nav-item ${isActive ? "active" : ""}`
             }
+            end={path === "/"}
           >
             <Icon size={22} className="auth-v2-nav-icon" />
           </NavLink>

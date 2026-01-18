@@ -33,11 +33,14 @@ type GetLogsParams = {
 export function getLogsV2(params: GetLogsParams = {}) {
   const search = new URLSearchParams();
 
-  if (params.limit) search.set("limit", String(params.limit));
+  if (params.limit !== undefined)
+    search.set("limit", String(params.limit));
   if (params.decision) search.set("decision", params.decision);
   if (params.entity) search.set("entity", params.entity);
 
   const qs = search.toString();
+
+  // Backend exposes both /logs and /logs/, canonicalize to /logs
   const path = qs ? `/logs?${qs}` : "/logs";
 
   return apiGet<LogsResponse>(path);

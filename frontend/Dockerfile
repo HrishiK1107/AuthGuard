@@ -1,5 +1,3 @@
-# Phase 8.4 — AuthGuard Frontend Dockerfile
-
 # ---------- Build stage ----------
 FROM node:20-alpine AS builder
 
@@ -24,8 +22,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built frontend
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built frontend into /dashboard
+COPY --from=builder /app/dist /usr/share/nginx/html/dashboard
 
 EXPOSE 80
 

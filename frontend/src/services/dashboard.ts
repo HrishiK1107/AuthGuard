@@ -1,46 +1,65 @@
 import { apiGet } from "./api";
 
 /* =========================
-   Dashboard V2 Contract
+   TYPES (USED BY DASHBOARDV2)
 ========================= */
+
+export type DecisionBreakdown = {
+  ALLOW: number;
+  CHALLENGE: number;
+  BLOCK: number;
+};
 
 export type DashboardSummary = {
   total_events: number;
-
-  decision_breakdown: {
-    ALLOW: number;
-    CHALLENGE: number;
-    BLOCK: number;
-  };
-
-  top_entities: {
-    entity: string;
-    count: number;
-  }[];
-
+  decision_breakdown: DecisionBreakdown;
+  top_entities: { entity: string; count: number }[];
   timeline: {
-    ts: number; // unix timestamp (seconds)
+    ts: number;
     ALLOW: number;
     CHALLENGE: number;
     BLOCK: number;
   }[];
 };
 
-/* =========================
-   Phase 4 Contracts
-========================= */
+export type DashboardMetrics = {
+  throughput: {
+    total_requests: number;
+    last_24h: number;
+  };
+  mitigation_rate: {
+    blocked_percent: number;
+  };
+  risk_drift: {
+    avg_24h: number;
+    avg_all_time: number;
+    delta: number;
+  };
+  timeline: any[];
+  risk_distribution: {
+    low: number;
+    medium: number;
+    high: number;
+  };
+  top_entities: {
+    entity: string;
+    risk: number;
+  }[];
+  threat_feed: any[];
+  generated_at: number;
+};
 
 export type RecentThreat = {
   entity: string;
-  decision: "ALLOW" | "CHALLENGE" | "BLOCK";
-  risk: "LOW" | "MEDIUM" | "HIGH";
+  decision: string;
+  risk: string;
   ts: number;
 };
 
 export type TopEntity = {
   entity: string;
   count: number;
-  risk: "LOW" | "MEDIUM" | "HIGH";
+  risk: string;
 };
 
 export type RiskDistribution = {
@@ -53,20 +72,30 @@ export type DecisionTimelinePoint = {
   ts: number;
   entity: string;
   decision: "ALLOW" | "CHALLENGE" | "BLOCK";
-  risk: "LOW" | "MEDIUM" | "HIGH";
+  risk: string;
 };
 
 /* =========================
-   API
+   API — CANONICAL
 ========================= */
 
-export function getDashboardV2() {
-  return apiGet<DashboardSummary>("/dashboard");
+// ORIGINAL (kept)
+export function getDashboardSummary() {
+  return apiGet<DashboardSummary>("/dashboard/");
+}
+
+export function getDashboardMetrics() {
+  return apiGet<DashboardMetrics>("/dashboard/metrics");
 }
 
 /* =========================
-   Phase 4 API Calls
+   API — DASHBOARD V2 ALIASES
+   (NO LOGIC CHANGE)
 ========================= */
+
+export function getDashboardV2() {
+  return getDashboardSummary();
+}
 
 export function getRecentThreats() {
   return apiGet<RecentThreat[]>("/dashboard/recent-threats");
@@ -81,5 +110,7 @@ export function getRiskDistributionV4() {
 }
 
 export function getDecisionTimelineV4() {
-  return apiGet<DecisionTimelinePoint[]>("/dashboard/decision-timeline");
+  return apiGet<DecisionTimelinePoint[]>(
+    "/dashboard/decision-timeline"
+  );
 }

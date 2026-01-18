@@ -38,5 +38,6 @@ export function getEnforcerHealth() {
 }
 
 export function getEnforcementSettings() {
-  return apiGet<{ mode: EnforcementMode }>("/settings");
+  // 🔥 IMPORTANT: trailing slash REQUIRED
+  return apiGet<{ mode: EnforcementMode }>("/settings/");
 }

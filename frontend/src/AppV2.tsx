@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
 /* ===== APP SHELL ===== */
 import AppShell from "./components/layout/AppShell";
@@ -19,19 +19,21 @@ import DecisionExplorer from "./pages/DecisionExplorer";
 export default function AppV2() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
+      {/* basename = /dashboard */}
       <Route element={<AppShell />}>
-        <Route path="/dashboard" element={<DashboardV2 />} />
-        <Route path="/logs" element={<LogsV2 />} />
-        <Route path="/campaigns" element={<CampaignsV2 />} />
-        <Route path="/rules" element={<DetectionRulesV2 />} />
-        <Route path="/blocks" element={<ActiveBlocksV2 />} />
-        <Route path="/simulator" element={<AttackSimulatorV2 />} />
-        <Route path="/health" element={<SystemHealthV2 />} />
-        <Route path="/enforcement" element={<SettingsV2 />} />
-        <Route path="/settings" element={<SettingsV2 />} />
-        <Route path="/decision/:eventId" element={<DecisionExplorer />} />
+        {/* /dashboard */}
+        <Route index element={<DashboardV2 />} />
+
+        {/* /dashboard/... */}
+        <Route path="logs" element={<LogsV2 />} />
+        <Route path="campaigns" element={<CampaignsV2 />} />
+        <Route path="rules" element={<DetectionRulesV2 />} />
+        <Route path="blocks" element={<ActiveBlocksV2 />} />
+        <Route path="simulator" element={<AttackSimulatorV2 />} />
+        <Route path="health" element={<SystemHealthV2 />} />
+        <Route path="settings" element={<SettingsV2 />} />
+        <Route path="enforcement" element={<SettingsV2 />} />
+        <Route path="decision/:eventId" element={<DecisionExplorer />} />
       </Route>
     </Routes>
   );

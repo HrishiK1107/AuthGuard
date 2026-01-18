@@ -23,5 +23,6 @@ export type CampaignsResponse = {
 ========================= */
 
 export function getCampaignsV2() {
-  return apiGet<CampaignsResponse>("/campaigns");
+  // @router.get("/")
+  return apiGet<CampaignsResponse>("/campaigns/");
 }

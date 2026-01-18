@@ -25,13 +25,21 @@ export type ActiveBlocksResponse = {
 ========================= */
 
 export function getActiveBlocksV2() {
-  return apiGet<ActiveBlocksResponse>("/blocks");
+  // @router.get("/")
+  return apiGet<ActiveBlocksResponse>("/blocks/");
 }
 
 export function manualBlock(entity: string) {
+  // @router.post("/block")
   return apiPost("/blocks/block", { entity });
 }
 
 export function manualUnblock(entity: string) {
+  // @router.post("/unblock")
   return apiPost("/blocks/unblock", { entity });
+}
+
+export function getEnforcerHealth() {
+  // @router.get("/enforcer/health")
+  return apiGet<{ status: "up" | "down" }>("/blocks/enforcer/health");
 }
