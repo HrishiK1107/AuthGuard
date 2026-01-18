@@ -1,31 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  LayoutDashboard,
-  FileText,
-  Radar,
-  ListChecks,
-  Ban,
-  Bug,
-  HeartPulse,
-  Shield,
-} from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { getDetectionRulesV2 } from "../services/rules";
 import type { DetectionRule as ApiRule } from "../services/rules";
-
-/* =========================
-   SIDEBAR CONFIG
-========================= */
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Logs", icon: FileText, path: "/logs" },
-  { label: "Campaigns", icon: Radar, path: "/campaigns" },
-  { label: "Detection Rules", icon: ListChecks, path: "/rules" },
-  { label: "Active Blocks", icon: Ban, path: "/blocks" },
-  { label: "Attack Simulator", icon: Bug, path: "/simulator" },
-  { label: "System Health", icon: HeartPulse, path: "/health" },
-  { label: "Enforcement Control", icon: Shield, path: "/settings" },
-];
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
@@ -126,35 +102,35 @@ export default function DetectionRulesV2() {
                     key={r.name}
                     className="hover:bg-neutral-800 text-[0.98rem]"
                   >
-                    <td className="px-4 py-[18px] font-mono text-sm">
+                    <td className="px-4 py-[1.125rem] font-mono text-sm">
                       {r.name}
                     </td>
-                    <td className="px-4 py-[18px]">{r.entity}</td>
-                    <td className="px-4 py-[18px]">{r.threshold}</td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">{r.entity}</td>
+                    <td className="px-4 py-[1.125rem]">{r.threshold}</td>
+                    <td className="px-4 py-[1.125rem]">
                       {Math.round(r.confidence * 100)}%
                     </td>
-                    <td className="px-4 py-[18px]">{r.decay}</td>
-                    <td className="px-4 py-[18px]">{r.window}</td>
-                    <td className="px-4 py-[18px]">{r.trigger_count}</td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">{r.decay}</td>
+                    <td className="px-4 py-[1.125rem]">{r.window}</td>
+                    <td className="px-4 py-[1.125rem]">{r.trigger_count}</td>
+                    <td className="px-4 py-[1.125rem]">
                       {formatTs(r.last_triggered)}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold ${statusPill(
+                        className={`px-3 py-1 rounded-full text-[0.6875rem] font-semibold ${statusPill(
                           r.status
                         )}`}
                       >
                         {r.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-4 py-[18px] font-mono text-xs">
+                    <td className="px-4 py-[1.125rem] font-mono text-xs">
                       {r.version}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold ${loadedPill(
+                        className={`px-3 py-1 rounded-full text-[0.6875rem] font-semibold ${loadedPill(
                           r.loaded
                         )}`}
                       >

@@ -1,31 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  LayoutDashboard,
-  FileText,
-  Radar,
-  ListChecks,
-  Ban,
-  Bug,
-  HeartPulse,
-  Shield,
-} from "lucide-react";
 
 import { getCampaignsV2 } from "../services/campaigns";
 import type { Campaign } from "../services/campaigns";
-
-/* =========================
-   SIDEBAR CONFIG
-========================= */
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Logs", icon: FileText, path: "/logs" },
-  { label: "Campaigns", icon: Radar, path: "/campaigns" },
-  { label: "Detection Rules", icon: ListChecks, path: "/rules" },
-  { label: "Active Blocks", icon: Ban, path: "/blocks" },
-  { label: "Attack Simulator", icon: Bug, path: "/simulator" },
-  { label: "System Health", icon: HeartPulse, path: "/health" },
-  { label: "Enforcement Control", icon: Shield, path: "/settings" },
-];
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
@@ -165,39 +141,39 @@ export default function CampaignsV2() {
                     key={c.id}
                     className="hover:bg-neutral-800 text-[0.98rem]"
                   >
-                    <td className="px-4 py-[18px] font-mono text-sm">
+                    <td className="px-4 py-[1.125rem] font-mono text-sm">
                       {c.id}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       {c.primaryVector}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       {formatTs(c.start)}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       {formatTs(c.lastSeen)}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       {c.events}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       {c.entities}
                     </td>
                     <td
-                      className={`px-4 py-[18px] font-semibold ${riskColor(
+                      className={`px-4 py-[1.125rem] font-semibold ${riskColor(
                         c.risk
                       )}`}
                     >
                       {c.risk}
                     </td>
-                    <td className="px-4 py-[18px] text-xs font-mono">
+                    <td className="px-4 py-[1.125rem] text-xs font-mono">
                       A:{c.decisions.allow} · C:
                       {c.decisions.challenge} · B:
                       {c.decisions.block}
                     </td>
-                    <td className="px-4 py-[18px]">
+                    <td className="px-4 py-[1.125rem]">
                       <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold ${stateBadge(
+                        className={`px-3 py-1 rounded-full text-[0.6875rem] font-semibold ${stateBadge(
                           c.state
                         )}`}
                       >

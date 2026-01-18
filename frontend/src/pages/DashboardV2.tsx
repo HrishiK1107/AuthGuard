@@ -207,7 +207,7 @@ export default function DashboardV2() {
                 <div className="auth-card-title">
                   Decision Timeline (Last 15 min)
                 </div>
-                <div style={{ height: 220 }}>
+                <div style={{ height: "13.75rem" }}>
                   <DecisionTimelineChart data={timelineData} />
                 </div>
               </div>

@@ -1,14 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  LayoutDashboard,
-  FileText,
-  Radar,
-  ListChecks,
-  Ban,
-  Bug,
-  HeartPulse,
-  Shield,
-} from "lucide-react";
 
 import { getLogsV2 } from "../services/logs";
 import type { LogEntry } from "../services/logs";
@@ -145,8 +135,8 @@ export default function LogsV2() {
           <div
             className="max-h-[65vh] overflow-y-auto"
             style={{
-              scrollbarWidth: "none",     // Firefox
-              msOverflowStyle: "none",    // IE / Edge legacy
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
             }}
           >
             {/* Chromium / WebKit */}
