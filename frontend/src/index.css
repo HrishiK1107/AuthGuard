@@ -23,12 +23,13 @@ body {
 /* =========================
   ROOT
 ========================= */
-
 .auth-v2-root {
   display: flex;
+  flex: 1;              /* 🔑 THIS IS THE FIX */
   min-height: 100vh;
   background: #000000;
 }
+
 
 /* =========================
   SIDEBAR
