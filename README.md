@@ -14,9 +14,13 @@ AuthGuard is a **defensive security control**, not an authentication provider.
 
 > Screenshots reflect the real operator UI and system behavior.
 
-<img width="1898" height="860" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/d36d41d7-298e-4604-b2f5-a8169dc93998" />
-<img width="1896" height="936" alt="Detection & Enforcement Views" src="https://github.com/user-attachments/assets/15cd741f-c61c-4a48-9c47-159d451007a2" />
-<img width="1560" height="576" alt="Campaign Correlation" src="https://github.com/user-attachments/assets/004d4cf5-0b77-4fe0-9399-873e37cb3ae7" />
+<img width="940" height="476" alt="image" src="https://github.com/user-attachments/assets/880cdc43-0e88-4b2d-b37e-44cfa240d94e" />
+<img width="940" height="476" alt="image" src="https://github.com/user-attachments/assets/bb0eb0d1-64b9-46bb-86d6-54b9e3fd62e9" />
+<img width="940" height="476" alt="image" src="https://github.com/user-attachments/assets/bd827d41-04ed-4ed3-b990-0c2a39812eb4" />
+<img width="940" height="476" alt="image" src="https://github.com/user-attachments/assets/8596089d-402e-4991-8d91-bc25749963f9" />
+<img width="940" height="438" alt="image" src="https://github.com/user-attachments/assets/4de5c786-5da6-4b28-b187-a2868afea832" />
+<img width="940" height="458" alt="image" src="https://github.com/user-attachments/assets/8e2feee2-2fd6-486e-815b-018e5543aadb" />
+
 
 ---
 
