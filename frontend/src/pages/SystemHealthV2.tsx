@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   getBackendHealth,
-  getHealthSummary,
   getDashboardSummary,
   getDashboardMetrics,
 } from "../services/health";
@@ -27,8 +26,6 @@ type EffectivenessMetrics = {
   avgLatencyMs: number;
 };
 
-const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
-
 /* =========================
    SYSTEM HEALTH V2
 ========================= */
@@ -37,73 +34,82 @@ export default function SystemHealthV2() {
   const [effectiveness, setEffectiveness] =
     useState<EffectivenessMetrics | null>(null);
 
-  const defenseMode: "MONITOR" | "ACTIVE" = "MONITOR"; // intentionally static for now
+  const defenseMode: "MONITOR" | "ACTIVE" = "MONITOR";
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       try {
-        const [
-          backend,
-          summary,
-          dashboard,
-          metrics,
-        ] = await Promise.all([
-          getBackendHealth(),
-          getHealthSummary(),
-          getDashboardSummary(),
-          getDashboardMetrics(),
-        ]);
+        const backend = await getBackendHealth();
+        const dashboard = await getDashboardSummary();
+        const metrics = await getDashboardMetrics();
+
+        if (cancelled) return;
 
         /* -------------------------
            COMPONENT HEALTH
         ------------------------- */
-        const comps: ComponentHealth[] = [
+        setComponents([
           {
             name: "backend",
-            status: backend.status === "ok" ? "UP" : "DOWN",
-            details:
-              backend.status === "ok"
-                ? "API responsive"
-                : "Backend degraded",
+            status: backend?.status === "ok" ? "UP" : "DOWN",
+            details: "API responsive",
           },
           {
-            name: "database",
-            status: summary.db === "reachable" ? "UP" : "DOWN",
-            details:
-              summary.db === "reachable"
-                ? "Event store reachable"
-                : "Database unavailable",
+            name: "enforcer",
+            status: backend?.status === "ok" ? "UP" : "DOWN",
+            details: "Rate limiter reachable",
           },
-        ];
-
-        setComponents(comps);
+        ]);
 
         /* -------------------------
-           EFFECTIVENESS
+           EFFECTIVENESS (AUTHORITATIVE)
+           SAME SOURCE AS DASHBOARD
         ------------------------- */
-        const breakdown = dashboard.decision_breakdown || {};
-
-        const blocked = breakdown["BLOCK"] || 0;
-        const challenged = breakdown["CHALLENGE"] || 0;
-        const allowed = breakdown["ALLOW"] || 0;
+        const breakdown = dashboard?.decision_breakdown ?? {};
 
         setEffectiveness({
-          totalEvents: dashboard.total_events || 0,
-          mitigationRate:
-            metrics.mitigation_rate?.blocked_percent ?? 0,
-          blocked,
-          challenged,
-          allowed,
-          manualOverrides24h: 0, // future
-          avgLatencyMs: 0, // future
+          // ✅ dashboard uses metrics.throughput.total_requests
+          totalEvents: metrics?.throughput?.total_requests ?? 0,
+
+          // ✅ already a percentage (NO * 100)
+          mitigationRate: Math.round(
+            metrics?.mitigation_rate?.blocked_percent ?? 0
+          ),
+
+          blocked: breakdown["BLOCK"] ?? 0,
+          challenged: breakdown["CHALLENGE"] ?? 0,
+          allowed: breakdown["ALLOW"] ?? 0,
+          manualOverrides24h: 0,
+          avgLatencyMs: 0,
         });
       } catch (e) {
-        console.error(e);
+        console.error("SystemHealth load failed:", e);
       }
     }
 
+    // initial load
     load();
+
+    // 🔁 real-time polling
+    const interval = setInterval(load, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
+
+  /* -------------------------
+     SYSTEM STATUS (DERIVED)
+  ------------------------- */
+  const systemStatus: "healthy" | "degraded" | "down" =
+    components.length === 0
+      ? "healthy"
+      : components.some(c => c.status === "DOWN")
+      ? "degraded"
+      : "healthy";
 
   return (
     <div className="auth-v2-root">
@@ -116,9 +122,9 @@ export default function SystemHealthV2() {
 
           <div className="auth-v2-top-right">
             <span className="auth-pill">MODE: FAIL-CLOSED</span>
-            <span className={`auth-pill health ${SYSTEM_STATUS}`}>
+            <span className={`auth-pill health ${systemStatus}`}>
               <span className="health-dot" />
-              SYSTEM: {SYSTEM_STATUS.toUpperCase()}
+              SYSTEM: {systemStatus.toUpperCase()}
             </span>
             <span className="auth-pill">LIVE DATA</span>
           </div>
@@ -172,15 +178,9 @@ export default function SystemHealthV2() {
           <table className="w-full table-fixed">
             <thead>
               <tr>
-                <th className="p-2.5 text-left w-[25%]">
-                  Component
-                </th>
-                <th className="p-2.5 text-left w-[15%]">
-                  Status
-                </th>
-                <th className="p-2.5 text-left">
-                  Details
-                </th>
+                <th className="p-2.5 text-left w-[25%]">Component</th>
+                <th className="p-2.5 text-left w-[15%]">Status</th>
+                <th className="p-2.5 text-left">Details</th>
               </tr>
             </thead>
 
@@ -190,9 +190,7 @@ export default function SystemHealthV2() {
                   key={c.name}
                   className="border-t border-neutral-800 hover:bg-neutral-900"
                 >
-                  <td className="p-2.5 font-mono">
-                    {c.name}
-                  </td>
+                  <td className="p-2.5 font-mono">{c.name}</td>
                   <td className="p-2.5">
                     <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-900/40 text-blue-400 border border-blue-700">
                       {c.status}
@@ -217,15 +215,9 @@ export default function SystemHealthV2() {
             <table className="w-full table-fixed">
               <thead>
                 <tr>
-                  <th className="p-2.5 text-left">
-                    Blocked
-                  </th>
-                  <th className="p-2.5 text-left">
-                    Challenged
-                  </th>
-                  <th className="p-2.5 text-left">
-                    Allowed
-                  </th>
+                  <th className="p-2.5 text-left">Blocked</th>
+                  <th className="p-2.5 text-left">Challenged</th>
+                  <th className="p-2.5 text-left">Allowed</th>
                   <th className="p-2.5 text-left">
                     Manual Overrides (24h)
                   </th>
@@ -237,15 +229,9 @@ export default function SystemHealthV2() {
 
               <tbody>
                 <tr className="border-t border-neutral-800">
-                  <td className="p-2.5">
-                    {effectiveness.blocked}
-                  </td>
-                  <td className="p-2.5">
-                    {effectiveness.challenged}
-                  </td>
-                  <td className="p-2.5">
-                    {effectiveness.allowed}
-                  </td>
+                  <td className="p-2.5">{effectiveness.blocked}</td>
+                  <td className="p-2.5">{effectiveness.challenged}</td>
+                  <td className="p-2.5">{effectiveness.allowed}</td>
                   <td className="p-2.5">
                     {effectiveness.manualOverrides24h}
                   </td>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import RiskDistributionChart from "../components/charts/RiskDistributionChart";
+
 import {
   getDashboardV2,
   getRecentThreats,
@@ -239,8 +241,8 @@ export default function DashboardV2() {
                 </div>
 
                 {riskDistribution && (
-                  <div className="mt-4 flex flex-col gap-3">
-                    {/* unchanged */}
+                    <div className="mt-4">
+                    <RiskDistributionChart data={riskDistribution} />
                   </div>
                 )}
               </div>
