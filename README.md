@@ -43,60 +43,85 @@ All enforcement is:
 ## System Architecture
 
 ```
-Client / Simulator
-        |
-        v
-+--------------------+
-| FastAPI Ingest API |
-|  (/events/auth)   |
-+--------------------+
-        |
-        v
-+------------------------+
-| Event Normalization    |
-| (Raw → Canonical)      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Detection Engine       |
-| - Behavioral Signals   |
-| - Sliding Windows      |
-+------------------------+
-        |
-        v
-+------------------------+
-| Campaign Correlation   |
-| - Multi-event linking  |
-+------------------------+
-        |
-        v
-+------------------------+
-| Risk Engine            |
-| - Time decay           |
-| - Aggregation          |
-+------------------------+
-        |
-        v
-+------------------------+
-| Decision Engine        |
-| - ALLOW / CHALLENGE / |
-|   BLOCK                |
-+------------------------+
-        |
-        +--------------------+
-        |                    |
-        v                    v
-+----------------+    +-------------------+
-| Go Enforcer    |    | Alerting Engine   |
-| (TTL control)  |    | (Webhooks)        |
-+----------------+    +-------------------+
-        |
-        v
-+------------------------+
-| Persistent Storage     |
-| (SQLite event_log)     |
-+------------------------+
+
+                         ┌─────────────────────────┐
+                         │        Client /          │
+                         │   Attack Simulator       │
+                         │  (Login / OTP / API)     │
+                         └─────────────┬───────────┘
+                                       │
+                                       v
+        ┌──────────────────────────────────────────────────┐
+        │                NGINX (Docker)                     │
+        │  - Serves Landing Page                             │
+        │  - Routes /dashboard → Frontend SPA                │
+        │  - Proxies /api → FastAPI Backend                  │
+        └─────────────┬────────────────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+          v                       v
+
+┌──────────────────────┐   ┌──────────────────────────────┐
+│  Frontend (React)    │   │  Backend (FastAPI – Docker)   │
+│  Operator Dashboard  │   │                              │
+│  - Dashboard v2      │   │  /events/auth (Ingest API)   │
+│  - Logs & Events     │   │                              │
+│  - Campaigns         │   └─────────────┬────────────────┘
+│  - Enforcement View  │                 │
+└──────────────────────┘                 v
+                             ┌────────────────────────────┐
+                             │ Event Normalization Layer  │
+                             │ Raw Auth → Canonical Event │
+                             └─────────────┬──────────────┘
+                                           v
+                             ┌────────────────────────────┐
+                             │ Detection Engine            │
+                             │ - Sliding Windows           │
+                             │ - Behavioral Signals        │
+                             │ - Replay Safety             │
+                             └─────────────┬──────────────┘
+                                           v
+                             ┌────────────────────────────┐
+                             │ Campaign Correlation        │
+                             │ - Multi-event Attribution  │
+                             │ - Confidence Linking       │
+                             └─────────────┬──────────────┘
+                                           v
+                             ┌────────────────────────────┐
+                             │ Risk Engine v2              │
+                             │ - Time Decay                │
+                             │ - Entity Aggregation        │
+                             │ - Normalization / Ceilings │
+                             └─────────────┬──────────────┘
+                                           v
+                             ┌────────────────────────────┐
+                             │ Decision Engine             │
+                             │ - Policy-driven             │
+                             │ - ALLOW / CHALLENGE         │
+                             │ - TEMP_BLOCK / HARD_BLOCK   │
+                             └─────────────┬──────────────┘
+                                           │
+                 ┌─────────────────────────┴─────────────────────────┐
+                 │                                                     │
+                 v                                                     v
+┌────────────────────────────┐             ┌────────────────────────────┐
+│ Go Rate Limiter (Docker)   │             │ Alerting Engine             │
+│ - TTL-based enforcement   │             │ - Deduplication             │
+│ - Token / Sliding Buckets │             │ - Severity mapping           │
+│ - Persistent block store  │             │ - Webhook delivery           │
+└─────────────┬──────────────┘             └────────────────────────────┘
+              │
+              v
+┌──────────────────────────────────────────────────────────┐
+│ Persistent Storage (SQLite)                               │
+│ - Event Logs                                              │
+│ - Decisions                                               │
+│ - Campaigns                                               │
+│ - Enforcement Records                                     │
+└──────────────────────────────────────────────────────────┘
+
+
 ```
 
 ---
