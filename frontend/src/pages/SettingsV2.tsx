@@ -10,40 +10,46 @@ import {
 } from "../services/enforcement";
 
 import { apiPost } from "../services/api";
-
-import type {
-  ActiveBlock,
-  EnforcementMode,
-} from "../services/enforcement";
+import type { ActiveBlock, EnforcementMode } from "../services/enforcement";
 
 const SYSTEM_STATUS: "healthy" | "degraded" | "down" = "healthy";
 
 /* =========================
    HELPERS
 ========================= */
+
 function modeBadge(mode: EnforcementMode) {
   return mode === "fail-closed"
     ? { label: "ACTIVE", status: "active" as const }
     : { label: "MONITOR", status: "medium" as const };
 }
 
-function blockBadge(decision: string) {
-  return decision === "HARD_BLOCK"
-    ? { label: "HARD", status: "blocked" as const }
+function decisionBadge(decision: string) {
+  return decision === "HARD_BLOCK" || decision === "BLOCK"
+    ? { label: "BLOCK", status: "blocked" as const }
     : { label: "TEMP", status: "high" as const };
+}
+
+function ttlSeconds(block: ActiveBlock): string {
+  if (!block.expires_ts) return "—";
+  const now = Math.floor(Date.now() / 1000);
+  return Math.max(block.expires_ts - now, 0).toString();
 }
 
 /* =========================
    ENFORCEMENT CONTROL V2
 ========================= */
+
 export default function EnforcementControlV2() {
   const [mode, setMode] =
     useState<EnforcementMode>("fail-closed");
   const [blocks, setBlocks] = useState<ActiveBlock[]>([]);
-  const [enforcerUp, setEnforcerUp] = useState<boolean>(false);
+  const [enforcerUp, setEnforcerUp] = useState(false);
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       try {
         const [blocksRes, enforcer, settings] =
@@ -53,20 +59,29 @@ export default function EnforcementControlV2() {
             getEnforcementSettings(),
           ]);
 
+        if (cancelled) return;
+
         setBlocks(blocksRes.blocks || []);
         setEnforcerUp(enforcer.status === "up");
         setMode(settings.mode);
       } catch (e) {
-        console.error(e);
+        console.error("Enforcement load failed:", e);
       }
     }
 
     load();
+    const interval = setInterval(load, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   /* =========================
      TOGGLE MODE
   ========================= */
+
   const toggleMode = async () => {
     if (toggling) return;
 
@@ -80,8 +95,7 @@ export default function EnforcementControlV2() {
       await apiPost("/settings/mode", { mode: nextMode });
     } catch (e) {
       console.error(e);
-      // rollback on failure
-      setMode(mode);
+      setMode(mode); // rollback
     } finally {
       setToggling(false);
     }
@@ -92,7 +106,6 @@ export default function EnforcementControlV2() {
   return (
     <div className="auth-v2-root">
       <main className="auth-v2-main">
-        {/* TOP BAR */}
         <div className="auth-v2-topbar">
           <div className="auth-v2-title">
             AUTHENTICATION ABUSE DETECTION SYSTEM
@@ -112,13 +125,11 @@ export default function EnforcementControlV2() {
 
         <div className="logs-v2-divider" />
 
-        {/* PAGE TITLE */}
         <h1 className="logs-v2-title">ENFORCEMENT CONTROL</h1>
         <p className="text-sm text-neutral-400 mb-4">
           Live enforcement mode, system health, and active interventions.
         </p>
 
-        {/* TOP METRICS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="auth-card-elevated">
             <div className="auth-card-title">Defense Mode</div>
@@ -150,7 +161,6 @@ export default function EnforcementControlV2() {
           </div>
         </div>
 
-        {/* ACTIVE ENFORCEMENT */}
         <div className="auth-card-elevated mt-4">
           <div className="auth-card-title mb-3">
             Active Enforcement
@@ -159,8 +169,7 @@ export default function EnforcementControlV2() {
           <Table
             headers={[
               "Entity",
-              "Scope",
-              "Type",
+              "Decision",
               "Risk",
               "TTL (s)",
               "Source",
@@ -170,28 +179,18 @@ export default function EnforcementControlV2() {
             {blocks.length === 0 ? (
               <EmptyState
                 message="No active blocks. Enforcement is armed and monitoring."
-                colSpan={7}
+                colSpan={6}
               />
             ) : (
               blocks.map((b) => (
-                <tr
-                  key={b.id}
-                  className="border-t border-neutral-800"
-                >
+                <tr key={b.id} className="border-t border-neutral-800">
                   <td className="px-3 py-2">{b.entity}</td>
-                  <td className="px-3 py-2">{b.scope}</td>
                   <td className="px-3 py-2">
-                    <StatusBadge {...blockBadge(b.decision)} />
+                    <StatusBadge {...decisionBadge(b.decision)} />
                   </td>
-                  <td className="px-3 py-2">
-                    {b.risk ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">
-                    {b.ttl_seconds}
-                  </td>
-                  <td className="px-3 py-2">
-                    {b.source}
-                  </td>
+                  <td className="px-3 py-2">{b.risk ?? "—"}</td>
+                  <td className="px-3 py-2">{ttlSeconds(b)}</td>
+                  <td className="px-3 py-2">{b.source}</td>
                   <td className="px-3 py-2">
                     <button
                       disabled

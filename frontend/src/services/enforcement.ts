@@ -1,19 +1,23 @@
 import { apiGet } from "./api";
 
 /* =========================
-   Types
+   Types (BACKEND-CANONICAL)
 ========================= */
 
 export type EnforcementMode = "fail-open" | "fail-closed";
 
+/**
+ * Shape returned by backend /blocks
+ */
 export type ActiveBlock = {
   id: string;
   entity: string;
-  scope: string;
-  decision: "TEMP_BLOCK" | "HARD_BLOCK";
+  decision: "BLOCK" | "HARD_BLOCK";
   risk: number | null;
-  ttl_seconds: number;
-  source: "auto" | "manual";
+  active: boolean;
+  source: "manual" | "auto" | "unknown";
+  created_ts: number | null;
+  expires_ts: number | null;
 };
 
 export type BlocksResponse = {
@@ -38,6 +42,5 @@ export function getEnforcerHealth() {
 }
 
 export function getEnforcementSettings() {
-  // 🔥 IMPORTANT: trailing slash REQUIRED
   return apiGet<{ mode: EnforcementMode }>("/settings/");
 }
